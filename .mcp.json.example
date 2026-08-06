@@ -1,0 +1,15 @@
+{
+  "_comment": "Connector config TEMPLATE for the Engineering Office Standard plugin. Copy to .mcp.json and fill in per-machine values. NO SECRETS IN THIS FILE OR IN .mcp.json — tokens/passwords stay in the gitignored credentials.yml that each server reads at run time. Verify presence, never value. Adjust command/args/url to how each server is launched on your host.",
+  "mcpServers": {
+    "infra-utility": {
+      "_comment": "Your infrastructure/utility MCP (host access, scripts, file reads). Reachable however you run it (local, or over a private overlay). Reads credentials.yml itself; do not put secrets here.",
+      "type": "http",
+      "url": "http://<UTILITY_MCP_HOST>:<PORT>/mcp"
+    },
+    "mist-cloud": {
+      "_comment": "Juniper Mist API MCP. Org id + API token come from credentials.yml on the host, not from here.",
+      "type": "http",
+      "url": "http://<MIST_MCP_HOST>:<PORT>/mcp"
+    }
+  }
+}

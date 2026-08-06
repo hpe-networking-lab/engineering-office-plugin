@@ -1,0 +1,43 @@
+# Engineering Office Standard — configuration
+# Copy this file to `eo.config.yaml` and fill it in. The skills adapt to YOUR setup:
+# nothing here assumes any particular lab, server, or repo. Keep `eo.config.yaml`
+# out of git if it names private paths (it's gitignored by default).
+#
+# You can run the standard two ways — pick with `mode` below:
+#   local   — everything lives on THIS computer. Skills read/write local files. Git is
+#             optional (a local repo is fine). No server or remote required.
+#   remote  — a git remote is your shared source of truth. Skills follow the
+#             branch -> PR -> review -> merge flow against it.
+
+mode: local                     # local | remote
+
+# --- Where your working data lives (used by skills instead of any hardcoded path) ---
+paths:
+  workspace_root: "./eo-workspace"     # your engagements / inventory / exports live under here
+  credentials_file: "./credentials.yml"  # gitignored; skills read secrets from here — presence, never value
+  exports_dir: "./eo-workspace/exports"# where config-backup writes baselines (and restore reads them)
+  scripts_dir: ""                        # OPTIONAL: your own automation scripts (backup/reconcile/restore/lint).
+                                         # Leave blank if you don't have them — the skill will describe the
+                                         # procedure and drive whatever tooling/connectors you do have.
+
+# --- Canonical standards source (optional, but recommended if you have one) ---
+# When set, this is AUTHORITATIVE: skills defer to it and you INHERIT standards updates
+# without re-publishing the plugin (this is how you avoid the snapshot-vs-source drift).
+# When blank, the discipline carried INSIDE each skill is the self-contained floor —
+# the bundle still works fully on its own.
+standards_source: ""            # e.g. "./standards"  (local folder)  OR  "https://github.com/<org>/standards.git"
+
+# --- Remote mode settings (ignored in local mode) ---
+remote:
+  repo_url: ""                  # your engagement/standards git remote
+  default_branch: "main"
+  pr_method: "web"              # web | gh-cli | token   (how you open PRs; token value stays out of git)
+
+# --- Connectors you actually use (skills only invoke what you enable) ---
+# Connection details (tokens, hosts, secrets) live in your credentials_file, never here.
+connectors:
+  mist: false                   # Juniper Mist
+  clearpass: false              # Aruba ClearPass
+  esxi: false                   # VMware ESXi
+  junos: false                  # Juniper Junos devices
+  windows_ad: false             # Windows / Active Directory

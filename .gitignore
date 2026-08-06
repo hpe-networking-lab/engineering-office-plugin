@@ -1,0 +1,16 @@
+# Secrets discipline — never commit credentials or a filled connector config.
+credentials.yml
+.mcp.json
+*.token
+*.key
+*.pem
+.env
+
+# Local noise
+__pycache__/
+*.pyc
+.DS_Store
+
+# user config (may name private paths) + local workspace
+eo.config.yaml
+eo-workspace/

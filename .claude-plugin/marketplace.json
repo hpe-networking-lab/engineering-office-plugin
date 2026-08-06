@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "engineering-office-marketplace",
+  "version": "0.5.0",
+  "description": "Engineering Office marketplace for the SE circle. Bundles the Engineering Office Standard and any future team plugins for one-click install.",
+  "owner": {
+    "name": "HPE Networking Lab — Engineering Office"
+  },
+  "plugins": [
+    {
+      "name": "engineering-office-plugin",
+      "description": "Guardrails grounding + flagship runbook skills (inventory-reconcile, mist-template-rollout) + connector config template.",
+      "version": "0.5.0",
+      "author": { "name": "HPE Networking Lab — Engineering Office" },
+      "source": "./"
+    }
+  ]
+}
