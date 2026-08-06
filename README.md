@@ -31,13 +31,14 @@ snapshot" and "always-current inheritance."
 
 ## What's inside
 
-Eleven skills — always-on grounding, read-only checks, engagement/documentation, and fully-gated change
+Twelve skills — always-on grounding, read-only checks, engagement/documentation, and fully-gated change
 runbooks. Each encodes the guardrails, not just the happy path, and defers to your `standards_source` when
 set.
 
 | Skill | What it does | Risk |
 |---|---|---|
 | **eo-guardrails** | The eight always-on reflexes + change/validation gates. | grounding |
+| **connector-setup** | Stand up your OWN hpe-networking MCP connector (Docker, HTTP, your creds) — checked one-command setup. | setup |
 | **inventory-reconcile** | Regenerate inventory from live (your connectors) and flag drift. | read-only |
 | **config-backup** | Versioned baseline export of live state before any change. | read-only |
 | **restore-config** | Roll back to a captured baseline (candidate config, confirmed snapshot revert). | change, gated |
@@ -54,7 +55,7 @@ engineering-office-plugin/
 ├── .claude-plugin/{plugin.json, marketplace.json}
 ├── config/eo.config.example.yaml   # copy to eo.config.yaml — mode, paths, standards_source, connectors
 ├── grounding/PROJECT-INSTRUCTIONS.md  # portable session grounding
-├── skills/<11 skills>/SKILL.md
+├── skills/<12 skills>/SKILL.md
 ├── .mcp.json.example                  # connector endpoints template (no secrets)
 ├── SETUP.md   README.md   LICENSE
 ```

@@ -48,6 +48,6 @@ You operate under the **Engineering Office Standard**. Self-ground before you to
 
 ## Skills you have (this plugin)
 
-`eo-guardrails` (always-on reflexes) · `inventory-reconcile` · `config-backup` · `restore-config` ·
+`eo-guardrails` (always-on reflexes) · `connector-setup` (first-run) · `inventory-reconcile` · `config-backup` · `restore-config` ·
 `sanitization-gate` · `engagement-scaffold` · `engagement-doc-package` · `nac-guest-coa` ·
 `mist-template-rollout` · `mist-org-migrate` · `proxmox-ml110-provision`.
