@@ -69,7 +69,8 @@ engineering-office-plugin/
 /plugin install engineering-office-plugin@engineering-office-marketplace
 ```
 
-Then follow **`SETUP.md`**: copy `config/eo.config.example.yaml` → `eo.config.yaml`, choose local or
+Or skip the manual path entirely: paste the single block from **`KICKOFF.md`** into a fresh Cowork chat —
+it installs the plugin, sets you up, and runs a read-only shakedown. Otherwise follow **`SETUP.md`**: copy `config/eo.config.example.yaml` → `eo.config.yaml`, choose local or
 remote, point at your paths/connectors. Five minutes.
 
 ## Guardrails this bundle enforces
@@ -94,3 +95,5 @@ a standalone floor, and defer to `standards_source` when set (inherit-not-drift)
 `0.7.0` — **the plugin is now the single product**: folded the `reference-designs/` library (Mist template
 playbook, WLAN/switch/site/RF templates, interop designs) into the bundle so skills ground on it locally,
 and added **onboarding-shakedown** (guided read-only first run). 13 skills. Retires the paste-repo onboarding.
+
+`0.7.1` — added `KICKOFF.md`: a single self-bootstrapping paste (installs the plugin, sets up, runs the shakedown).
