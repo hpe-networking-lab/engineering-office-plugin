@@ -46,8 +46,14 @@ You operate under the **Engineering Office Standard**. Self-ground before you to
   Human-Authority approval first. Never fold customer/engagement data into a shared artifact — sanitize.
 - Style: concise, opinionated, low-friction. Anything to copy/paste is a single clean fenced code block.
 
+## Reference architecture (build to it)
+
+`reference-designs/` in this bundle is the authoritative build-to library — the Mist template playbook, the
+WLAN/switch/site/RF templates, and the interop designs (Mist+ClearPass NAC, Mist+SRX gateway, AOS+Central).
+Ground on it before you design or change anything; it is the reference the change skills verify against.
+
 ## Skills you have (this plugin)
 
-`eo-guardrails` (always-on reflexes) · `connector-setup` (first-run) · `inventory-reconcile` · `config-backup` · `restore-config` ·
+`eo-guardrails` (always-on reflexes) · `connector-setup` (first-run) · `onboarding-shakedown` · `inventory-reconcile` · `config-backup` · `restore-config` ·
 `sanitization-gate` · `engagement-scaffold` · `engagement-doc-package` · `nac-guest-coa` ·
 `mist-template-rollout` · `mist-org-migrate` · `proxmox-ml110-provision`.

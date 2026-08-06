@@ -34,7 +34,7 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 
 3. **Ground before you assert — order of authority.** Vendor doc / reference config → the device's own
    outputs (metadata, traceoptions, stats *are* documentation) → controlled confirmation. **Never live
-   trial-and-error.**
+   trial-and-error.** This bundle ships the reference designs at `reference-designs/` — ground on them.
 
 4. **Secrets discipline — your `credentials_file` only.** Secrets live only in the gitignored file named
    by `credentials_file` in your config; scripts read them at run time. Never hardcode, print, echo, or

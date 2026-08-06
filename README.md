@@ -31,7 +31,7 @@ snapshot" and "always-current inheritance."
 
 ## What's inside
 
-Twelve skills — always-on grounding, read-only checks, engagement/documentation, and fully-gated change
+Thirteen skills — always-on grounding, read-only checks, engagement/documentation, and fully-gated change
 runbooks. Each encodes the guardrails, not just the happy path, and defers to your `standards_source` when
 set.
 
@@ -39,6 +39,7 @@ set.
 |---|---|---|
 | **eo-guardrails** | The eight always-on reflexes + change/validation gates. | grounding |
 | **connector-setup** | Stand up your OWN hpe-networking MCP connector (Docker, HTTP, your creds) — checked one-command setup. | setup |
+| **onboarding-shakedown** | Guided READ-ONLY first run to prove a new setup works end to end. | read-only, setup |
 | **inventory-reconcile** | Regenerate inventory from live (your connectors) and flag drift. | read-only |
 | **config-backup** | Versioned baseline export of live state before any change. | read-only |
 | **restore-config** | Roll back to a captured baseline (candidate config, confirmed snapshot revert). | change, gated |
@@ -55,7 +56,8 @@ engineering-office-plugin/
 ├── .claude-plugin/{plugin.json, marketplace.json}
 ├── config/eo.config.example.yaml   # copy to eo.config.yaml — mode, paths, standards_source, connectors
 ├── grounding/PROJECT-INSTRUCTIONS.md  # portable session grounding
-├── skills/<12 skills>/SKILL.md
+├── reference-designs/                 # Mist template playbook, WLAN/switch/site/RF templates, interop designs
+├── skills/<13 skills>/SKILL.md
 ├── .mcp.json.example                  # connector endpoints template (no secrets)
 ├── SETUP.md   README.md   LICENSE
 ```
@@ -86,3 +88,9 @@ engagement scaffold + docs, NAC CoA, Mist template + org-migrate, Proxmox).
 and connectors, optional authoritative `standards_source`) and `SETUP.md`; reworked all 11 skills and the
 grounding template to read your config instead of any hardcoded location, carry their discipline inline as
 a standalone floor, and defer to `standards_source` when set (inherit-not-drift). No lab/server assumed.
+
+`0.6.0` — added **connector-setup** (checked one-command standup of each engineer's own HTTP connector).
+
+`0.7.0` — **the plugin is now the single product**: folded the `reference-designs/` library (Mist template
+playbook, WLAN/switch/site/RF templates, interop designs) into the bundle so skills ground on it locally,
+and added **onboarding-shakedown** (guided read-only first run). 13 skills. Retires the paste-repo onboarding.
