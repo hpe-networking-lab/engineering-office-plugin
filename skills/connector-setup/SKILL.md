@@ -65,7 +65,7 @@ values live). This skill verifies a secret's **presence, never its value**, and 
    connection error. If it doesn't come up, read the container logs (`docker compose logs`) — a missing or
    misnamed secret file is the usual cause; ground it, don't guess.
 
-6. **Register the endpoint with your client.** Add an MCP connector pointing at `http://localhost:8000/mcp`
+6. **Register the endpoint with your client.** Add an MCP connector pointing at `http://localhost:8000/mcp` — **check your existing connectors first and give this one a unique name (e.g. `hpe-networking-eo`) so it can't shadow one you already run; if you already run a Mist/Central MCP, decide whether to use that instead of a second** —
    (adjust host/port if you changed them). Copy the shape from `.mcp.json.example` in this bundle — fill in
    your real URL. Claude Desktop has no native streamable-HTTP support, so if that's your client, bridge
    stdio↔HTTP with `npx supergateway` (Cowork / Claude Code connect to the HTTP URL directly).

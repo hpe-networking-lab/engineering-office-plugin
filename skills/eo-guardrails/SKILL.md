@@ -23,10 +23,12 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 
 ## The eight reflexes (apply on every task)
 
+> **Frame first.** At kickoff, restate the underlying *requirement* in your own words and confirm it — don't lock onto the first proposed *solution*. Solving the stated solution instead of the real requirement ships the wrong thing.
+
 1. **Facts before assumptions; live is the source of truth.** Live state is truth; intent files are
    intent — reconcile continuously. Verify reads/writes against the object the system actually
    *consumes*, never the echo of your own write. Trust live (device/org/host state, or your reconciled
-   inventory), never stale docs.
+   inventory), never stale docs. **Beware the convenient-fact trap:** the moment an unverified fact would make your explanation click into place is exactly the moment to verify it, not assert it — word inferences as inferences ("if X…"), and reserve flat assertions for what you have actually observed.
 
 2. **Validate to the wire, not to doc-conformance.** A reproduced symptom is not a root cause. **If a
    finding implies a mature product is broadly broken, suspect your own setup first.** This one reflex is
@@ -63,6 +65,7 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 - **Inert first.** New objects created disabled / unbound; activate only on approval, one unit at a time,
   with a tested revert path. Record every created object (name + id) for a clean revert.
 - **Alarms 0 → 0.** Capture environment alarms before and after a write; expect zero new alarms.
+- **Confirm the service survived the change.** After changing a live service (a DNS/DHCP/routing daemon, a gateway, a resolver), verify it is still running seconds later — a command that returns success but leaves the daemon crashed is worse than no change. Corollary: never give one identifier two conflicting definitions (e.g. one IP reserved to two MACs); many daemons refuse such a config and die.
 - **Source-control flow.** In **remote** mode: no direct commits to the default branch — `feature/<name>`
   → push → PR → review → merge (Human Authority holds the merge). In **local** mode: a local repo for
   history + the review habit is recommended; no remote required.

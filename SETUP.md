@@ -64,6 +64,18 @@ its value**, and never print it. Leave everything `false` if you're only using t
 
 Copy `.mcp.json.example` to `.mcp.json` and fill in your own MCP endpoints if you use MCP connectors.
 
+## Coexisting with your existing MCPs
+
+This plugin **registers no MCP automatically** — there is no active `.mcp.json` and the manifest declares
+no servers, so installing it never touches connectors you already run. Connectors are opt-in
+(`connectors:` in `eo.config.yaml`, all off by default). When you add one:
+
+- **Give it a unique name** (e.g. an `-eo` suffix) so it can't shadow a connector you already have.
+- **Already run a similar MCP** (your own Mist/Junos/etc.)? Either point the skills at it and don't add a
+  second, or keep both and know their tools overlap — Claude may be ambiguous about which to call.
+- **Spot duplicates fast:** the `onboarding-shakedown` skill's connector health check lists what's
+  connected, so you see overlaps before doing real work.
+
 ## 4. Try it
 
 Ask Claude to reconcile your inventory or capture a baseline. The relevant skill fires, reads your
