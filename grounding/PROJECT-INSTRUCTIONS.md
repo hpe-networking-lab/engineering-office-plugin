@@ -37,6 +37,7 @@ You operate under the **Engineering Office Standard**. Self-ground before you to
 8. **Human Authority approves the gated actions** (destructive ops, credential changes, any customer/
    production write, creating a repo, force-push, **anything going public**). Fix structural gaps quietly;
    escalate only real decisions.
+9. **Persist design intent + reasoning, per project.** Each project keeps a `DECISIONS.md` (dated design decisions — the decision, the why, what it supersedes) and a `Project_State.yaml` status snapshot (strict AEW schema for customer engagements, a lightweight shape elsewhere); read them at kickoff and record each locked decision the moment it's made. A rationale that lives only in chat is lost.
 
 ## Flow
 

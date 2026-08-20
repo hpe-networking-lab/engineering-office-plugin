@@ -51,14 +51,31 @@ set.
 | **mist-org-migrate** | Consolidate one Mist org into another (clone → release/claim → interop gate), by ID. | change, gated |
 | **proxmox-ml110-provision** | Bare-metal Proxmox on HPE Gen11 via iLO Redfish (worked example + method). | change, gated |
 
+### SRX / firewall family (vendored — separate from the guardrails)
+
+Seven Juniper **SRX** design/config/audit/troubleshoot playbooks, vendored from the community project [JNPRAutomate/fw-skills-share](https://github.com/JNPRAutomate/fw-skills-share) (MIT, commit `798f3ed`). A **separate family** from the Engineering Office guardrails, **read/plan-first** by design — any device change requires explicit approval and post-change verification. Full notice in `ATTRIBUTION-fw-skills-share.md`.
+
+| Skill | What it does |
+|---|---|
+| **parsing-srx-configs** | Normalize Junos `display set`/hierarchical config into the shared firewall schema. |
+| **srx-nat** | Source/destination/static NAT, NAT64/DNS64, CGN/PBA, persistent NAT, hairpin, proxy-ARP. |
+| **srx-policy** | Global/zone policy on 23.x+, AppID/AppFW, NGWF web filtering, SecIntel, ATP, hit-counts. |
+| **srx-advpn** | ADVPN spoke-to-spoke shortcuts, multipoint st0, OSPF p2mp, the cert-auth "No public key found" fix. |
+| **srx-autovpn-full-tunnel** | AutoVPN hub-and-spoke full-tunnel backhaul, group-ike-id, traffic selectors + ARI. |
+| **srx-ipsec-hub-spoke** | Static route-based IPsec hub-and-spoke, one st0 per spoke, hub source-NAT egress. |
+| **srx-chassis-cluster-proxmox** | vSRX chassis cluster whose nodes are Proxmox VE guests — bridges/VLANs, reth, MTU split. |
+
+> The upstream **deploy** skills (`clearpass-proxmox-deploy`, `sd-onprem-proxmox-deploy`) are intentionally not vendored — they touch devices and are lab-ops, not shareable guidance.
+
 ```
 engineering-office-plugin/
 ├── .claude-plugin/{plugin.json, marketplace.json}
 ├── config/eo.config.example.yaml   # copy to eo.config.yaml — mode, paths, standards_source, connectors
 ├── grounding/PROJECT-INSTRUCTIONS.md  # portable session grounding
 ├── reference-designs/                 # Mist template playbook, WLAN/switch/site/RF templates, interop designs
-├── skills/<13 skills>/SKILL.md
+├── skills/<13 EO skills + 7 vendored SRX skills>/SKILL.md
 ├── .mcp.json.example                  # connector endpoints template (no secrets)
+├── ATTRIBUTION-fw-skills-share.md   # SRX family provenance (MIT)
 ├── SETUP.md   README.md   LICENSE
 ```
 
@@ -97,3 +114,7 @@ playbook, WLAN/switch/site/RF templates, interop designs) into the bundle so ski
 and added **onboarding-shakedown** (guided read-only first run). 13 skills. Retires the paste-repo onboarding.
 
 `0.7.1` — added `KICKOFF.md`: a single self-bootstrapping paste (installs the plugin, sets up, runs the shakedown).
+
+`0.8.0` — guardrails refresh + chat-segmentation (hub-and-spoke) methodology + MCP coexistence notes.
+
+`0.9.0` — vendored the **SRX / firewall family** (7 Juniper SRX playbooks from JNPRAutomate/fw-skills-share, MIT) as a separate read/plan-first family; device-touching deploy skills excluded.
