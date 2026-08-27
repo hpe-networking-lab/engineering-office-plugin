@@ -5,7 +5,8 @@ description: Build, change, or troubleshoot an HPE Aruba AOS 10 Mobility Gateway
   clusters and bucket maps, AP-to-gateway tunnel anchoring, or when a tunnel-mode SSID will not anchor
   clients. Trigger words: AOS 10 gateway, Mobility Gateway, controller-ip, system IP, tunnel mode WLAN,
   tunnel orchestrator, OTO, ipsec-map, bucket map, Isoleader, cluster member IP, VLAN 4094, local
-  override, Reset Config, show ap active, SM_STATE_CONNECTING.
+  override, Reset Config, show ap active, SM_STATE_CONNECTING, overlay-wlan, Primary Gateway Cluster,
+  gw-cluster-list, dtunnel, WLAN will not anchor, gateway has no virtual-AP, RADIUS sourced from the AP.
 ---
 
 # AOS 10 Mobility Gateway + tunnel-mode WLAN — build and verify
@@ -60,6 +61,53 @@ cluster / WLAN / OTO config.
 **Do NOT diagnose from `show crypto isakmp sa`.** Per the OTO doc, AOS 10 skips IKE phase 1/2 entirely —
 the orchestrator generates the SPIs and keys. `% No active ISAKMP SA` and the CPSEC / mode-config
 counters in `show crypto isakmp stats` are EXPECTED, not the fault.
+
+---
+
+## 1b. The SECOND most important fact — a tunnel-mode WLAN needs a gateway-cluster BINDING
+
+A WLAN can sit at `forward-mode: FORWARD_MODE_L2` (that IS tunnel — the enum has only
+`FORWARD_MODE_BRIDGE` and `FORWARD_MODE_L2`) with an **empty Primary Gateway Cluster** and **no
+`overlay-wlan` object at any scope**. Nothing warns you. The WLAN looks correct in every listing and on
+the air, and no client will ever anchor.
+
+**The binding lives in a separate object**, not in the WLAN profile:
+
+```
+central_get_overlay_wlan(view_type=LOCAL, scope_id=<site>, device_function=CAMPUS_AP)
+-> {} ............ NO BINDING. This is the fault.
+
+healthy:
+{"profile": "<SSID>", "overlay-profile-type": "WIRELESS_PROFILE", "essid-name": "<SSID>",
+ "gw-cluster-list": [{"cluster": "<cluster-name>", "cluster-redundancy-type": "PRIMARY",
+                      "cluster-scope-id": "<site-scope-id>", "cluster-type": "CLUSTER_ID",
+                      "tunnel-type": "GRE"}]}
+```
+
+### Fault signature — memorise this, it is nothing like the §1 signature
+The tunnel infrastructure is **completely healthy** and everything in §6 passes. What you see instead:
+
+- gateway `show wlan virtual-ap` -> `Virtual AP profile "default" undefined.`
+- gateway `show wlan ssid-profile` -> `SSID Profile "default" undefined.`
+- gateway `show aaa profile` -> **no AAA profile for the SSID** (a healthy one appears automatically,
+  named `<SSID>_<digits>_`)
+- gateway RADIUS counters (`show aaa authentication-server radius statistics`) **never move** during a
+  client attempt
+- Central client events show `Client 802.1x Radius Reject` / `Client EAP Failure` — and ClearPass logs the
+  request **sourced from the AP's IP**, not the gateway's system IP
+
+That last point is the tell, and it is easy to misread: **the AP falls back to terminating 802.1X itself.**
+If your RADIUS server sees requests from the AP address while the gateway's own counters stay at zero, the
+SSID is not anchored, no matter what the WLAN profile says.
+
+### Fixing it — the binding is CREATE-ONLY and the API is unusable
+`central_manage_overlay_wlan action=create` returns **HTTP 500** on a payload the parser accepts (the
+`PRIMARY` enum validates), at every scope and object_type. PATCH returns "profile doesn't exist". The
+undocumented required sub-fields (`cluster-scope-id`, `cluster-type`, `tunnel-type`) are why.
+
+**Do it in the Central UI Create WLAN flow** (see §8 — Traffic Forwarding Mode and Primary Gateway Cluster
+are disabled on an existing WLAN, so the WLAN must be deleted and recreated). Capture the full profile
+JSON first.
 
 ---
 
@@ -170,12 +218,43 @@ Tunnels (Status Up).
 
 ### The success test is NOT `show ap active`
 In AOS 10 the gateway does not manage APs ("AP management and control is no longer provided by
-Gateways"). `show ap active` / `show ap database` are AOS 8 heritage commands and may legitimately read
-**Num APs: 0** on a perfectly healthy AOS 10 gateway. Do not use them as the done-test.
+Gateways"). `show ap active`, `show ap database` **and `show ap bss-table` run ON THE GATEWAY** are AOS 8
+heritage commands and may legitimately read **Num APs: 0** on a perfectly healthy AOS 10 gateway **with a
+live tunnelled client on it**. Do not use them as the done-test. (Note the asymmetry with §5:
+`show ap bss-table` is still the right check when run ON THE AP to confirm a WLAN change landed.)
+
+A confirmed real-world reading: `show ap bss-table` on the gateway reported `Num APs: 0 / Num
+Associations: 0` at the same moment `show user-table` showed a fully authenticated tunnelled client.
 
 **The real test:** a tunnelled client appears in the gateway's `show user-table` and
 `show datapath station table`, and Clients Active > 0 on the cluster dashboard. If a client associates and
 gets service but never appears there, it is being **bridged at the AP**, not tunnelled.
+
+What success actually looks like — the `Forward mode` column is the proof:
+```
+show user-table
+IP <ip>  MAC <client-mac>  Name <user>  Role <role>  Auth 802.1x
+Essid/Bssid  <SSID>/<ap-mac>   Profile <SSID>_<digits>_   Forward mode: dtunnel
+User Entries: 1/1
+
+show datapath station table   -> <client-mac>  TunId <id>  VLAN <n>
+RADIUS statistics             -> Raw Rq >0, Chal >0, Acc >=1, Bad Auth 0
+```
+`dtunnel` = decrypt-tunnel = the client is tunnelled to the gateway. `Forward mode` reading anything else
+(or the client never appearing) means bridged at the AP.
+
+### Probing RADIUS without a client — a REJECT is the SUCCESS signal
+`aaa test-server pap <server-name> <user> <deliberately-wrong-password>` from the gateway exercises
+transport, shared secret, NAS-client entry and source IP in one shot, with no wireless client needed.
+AOS prints `Authentication failed` for BOTH a reject and a timeout, so read the counters, not the text:
+- `Rej` increments with `Bad Auth 0` / `Mismatch Rsp 0` -> **PASS**. The server received, decrypted and
+  processed it: secret correct, NAS client defined, source IP as expected.
+- `Tmout` with no response -> FAIL: wrong secret, undefined NAS client, or unreachable.
+
+**Ignore the first packet's latency.** A newly created auth-server routinely shows `AvgRspTm` ~5000 ms on
+its very first request (cold socket setup) and trips the 5 s timeout, then settles to single-digit ms.
+Read `ExpAuthTm` (moving average), not the cumulative `AvgRspTm`, and do not open a ClearPass performance
+investigation on the strength of one cold packet.
 
 ---
 
@@ -217,6 +296,32 @@ vendor doc that the metric indicates the thing you want (see §6 — `show ap ac
 
 ---
 
+## 9b. Recreating a WLAN in the UI — scope and field traps
+
+Recreating a WLAN to restore a create-only field is routine (§8). These will bite you during it:
+
+- **"Create as a local profile" is a create-time decision.** Leave it unticked and you get a SHARED
+  (library) profile. A SHARED WLAN **cannot reference a site-LOCAL server group** —
+  `Cannot find in library '<name>' of type 'aruba-auth-server-group' referred in '<ssid>' of type
+  'aruba-wlan'`. If the WLAN you are replacing was site-local and pointed at site-local AAA objects, tick
+  the box; otherwise you must also promote the AAA objects to the library, which breaks the
+  "lab override dies at the site boundary" pattern.
+- **The Primary Server drop-down lists only library/shared auth servers.** Site-local ones do not appear,
+  even at that site's own scope. Use the inline **New Authentication Server** link.
+- **WPA2-Enterprise (and WPA-Enterprise, Both, Dynamic WEP) are greyed out** until you **uncheck the 6 GHz
+  band AND Wi-Fi 7 (802.11be)**. The banner says so — "Disable 6 GHz Band, Wi-Fi 7 (802.11be) to enable
+  legacy key management methods" — but it is easy to read as a hint rather than a hard gate. A WLAN
+  restored to a WPA2-Enterprise baseline must have its bands set first.
+- **Auth Server Mode must be "RADIUS with CoA"** if the design needs Change-of-Authorization. The UI then
+  warns: *CoA requires Dynamic Authorisation to be enabled in the Authentication Server Global profile* —
+  a separate object. Setting the server mode alone does not give you working CoA.
+- **A healthy push is observable.** After the binding lands, the gateway grows an AAA profile named
+  `<SSID>_<digits>_` (with `802.1X Authentication Profile`, default role and a `..._auth_svg` server group)
+  and `show switches` Config ID advances. If Config ID moves but no AAA profile appears, the binding did
+  not take.
+
+---
+
 ## 10. Recovery
 
 If the gateway loses its path to Central (no DNS, bad uplink) and the CLI is ACP-locked, it may need a
@@ -232,3 +337,19 @@ Built from a live AOS 10 gateway + tunnel-mode WLAN engagement (2026-08-27). Sec
 universal Engineering Office gates at the point of use; the canonical statements live in the guardrails
 (`eo-guardrails`) and in the practice's LESSONS record. If they ever disagree, the canonical record wins —
 fix this file.
+
+**Revised 2026-08-27 (same day, second pass) after tunnel mode was PROVEN end to end.** Added §1b
+(the gateway-cluster / `overlay-wlan` binding), §9b (UI scope and field traps when recreating a WLAN), the
+`dtunnel` success evidence and the `aaa test-server` probe technique in §6.
+
+The first pass of this runbook was correct about §1 (loopback System IP) but silent on the second fault,
+and that gap cost a full session: with the loopback already fixed, a tunnel-mode WLAN that had NO gateway
+cluster bound presented as "the tunnel orchestrator does not work in this hybrid tenant" — which was
+written into an engagement DECISIONS.md as a platform limitation and went unchallenged for two days. It
+was not a platform limitation. §6 previously implied `show ap bss-table` was a valid gateway-side check;
+on the gateway it reads `Num APs: 0` even with a live tunnelled client, which is exactly the false signal
+that produced the wrong conclusion. That line is now corrected.
+
+Standing lesson this file exists to prevent: **if every documented prerequisite reads green and the
+product still does not work, suspect your own setup — not the product — and never commit "X cannot be
+done" to a design record without a named mechanism and an explicit re-test trigger.**
