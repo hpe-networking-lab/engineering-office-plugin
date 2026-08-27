@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+- New skill **aos10-gateway-tunnel-build** — HPE Aruba AOS 10 Mobility Gateway + tunnel-mode WLAN: the system-IP-must-be-a-VLAN gate (loopback silently breaks AP tunnel anchoring), the New Central onboarding/prerequisite order, the Classic local-override Reset Config step, cluster/bucket-map facts, create-only forwarding mode, and the healthy-tunnel verification signature. Includes the correction that `show ap active` is NOT the done-test on AOS 10.
+- Skills are now inventoried by the practice's drift check, so a skill that contradicts the canonical lessons record surfaces as drift instead of rotting.
+
 ## 0.9.0
 - Portable grounding: added **reflex 9 — persist design intent + reasoning, per project** (every project keeps a DECISIONS.md + a status snapshot; read at kickoff, record each locked decision when made).
 - New **SRX / firewall skill family** (7 skills) vendored from JNPRAutomate/fw-skills-share (MIT, commit 798f3ed): parsing-srx-configs, srx-nat, srx-policy, srx-advpn, srx-autovpn-full-tunnel, srx-ipsec-hub-spoke, srx-chassis-cluster-proxmox. A separate, read/plan-first family from the guardrails; provenance in ATTRIBUTION-fw-skills-share.md. Upstream device-touching deploy skills intentionally excluded.
