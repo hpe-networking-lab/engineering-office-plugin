@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0
+- **New guardrail reflex — "check the shelf before you build or improvise."** Before writing a runbook, procedure, or skill for a vendor platform, list what the connectors already ship (`skills_list` → `skills_load`) and read it. Build only for the DELTA; name the vendor skill in yours and state the handoff; when both cover a step, theirs wins. Added as reflex 9 in `eo-guardrails`, reflex 10 in the portable grounding, and folded into the toolset-awareness section and the pre-flight self-check.
+- Origin: an AOS 8 → AOS 10 migration skill was built here without first checking that the connector already bundles a 192KB `aos-migration` skill. They turned out to be complements (assessment+planning vs execution+triage) — but that was luck, not method.
+
 ## 0.11.0
 - New skill **aos8-to-aos10-central-migration** — the controller-managed AOS 8 campus AP → AOS 10 / New Central migration runbook: cluster-type fork (hybrid vs pure New Central), the four prerequisite gates (GreenLake claim + valid subscription, persona, group, site), creating the AOS 10 group via Classic `configuration/v3/groups` so the device-collection actually populates, the controller-side `ap convert` sequence, the three things that leave a converted AP silent (site, WLAN disabled-by-default, the `no <field>` push rejections), the scope/precedence model, RADIUS/802.1X gotchas, and the green verification signature.
 - Includes the corrections that superseded earlier conclusions from the same effort: the firmware-floor theory, "dmo needs TAC", "site scope is broken", and "AP firmware upgrade is Select-Availability gated" were all disproved.

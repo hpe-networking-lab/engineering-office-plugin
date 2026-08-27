@@ -5,7 +5,7 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
   template, inventory, or repo. Use whenever the task touches Mist, Junos, ESXi, AD, ClearPass, a
   customer/production environment, secrets/credentials, a config write, a template, or a git commit/PR —
   or whenever you're about to assert a fact, deploy a change, or say a capability "doesn't exist."
-  Trigger words: guardrails, operating standard, ground before assert, validate to the wire, render gate,
+  Trigger words: guardrails, operating standard, check the shelf, skills_list, ground before assert, validate to the wire, render gate,
   one driver, reference by ID, secrets, credentials, Human Authority approval.
 ---
 
@@ -21,7 +21,7 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 > grows** (you inherit updates without re-installing). If it's blank, the discipline below is your
 > standard.
 
-## The eight reflexes (apply on every task)
+## The nine reflexes (apply on every task)
 
 > **Frame first.** At kickoff, restate the underlying *requirement* in your own words and confirm it — don't lock onto the first proposed *solution*. Solving the stated solution instead of the real requirement ships the wrong thing.
 
@@ -53,6 +53,14 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 7. **Reference by ID, not by name.** Orgs, sites, devices are addressed by stable **ID**, not display
    name. Names collide, get renamed, and silently point writes at the wrong object.
 
+9. **Check the shelf before you build or improvise.** Before writing a runbook, a procedure, or a new
+   skill for a vendor platform, list what your connectors already ship (for the `hpe-networking` MCP:
+   `skills_list` → `skills_load`) and read it. A vetted vendor runbook beats anything hand-written under
+   time pressure, and it is maintained by someone else. Build your own **only for the delta** — what the
+   bundled skill's own scope statement excludes, plus the execution failures and UI paths you paid for in
+   the field. If you build alongside one, NAME it in yours and state the handoff point; when both cover a
+   step, theirs wins. Skipping this check is the ground-before-you-assert failure applied to tooling.
+
 8. **Human Authority approves the gated actions.** Fix structural gaps quietly (a wrong assumption or
    stale-data slip is a *signal* to close a gap). Escalate only genuine approvals: destructive ops,
    credential changes, **any write to a customer/production environment**, creating a repo, force-push,
@@ -73,10 +81,11 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
   ([[sanitization-gate]]) **and** explicit Human-Authority approval before it goes out. Never fold
   customer or active-engagement data into a shared artifact — sanitize first.
 
-## Toolset awareness (before saying "can't")
+## Toolset awareness (before saying "can't" — and before building)
 
-Consult your configured scripts (`scripts_dir`), the connectors you've enabled, and your inventory before
-declaring a capability doesn't exist. Exhaust the grounded options before escalating; document dead ends.
+**Start with `skills_list` on every connector-backed request.** Then consult your configured scripts
+(`scripts_dir`), the connectors you've enabled, and your inventory before declaring a capability doesn't
+exist — or before hand-rolling a procedure that already ships. Exhaust the grounded options before escalating; document dead ends.
 
 ## The continuous-improvement loop (governance)
 
@@ -87,6 +96,8 @@ mandatory, a bad lesson can't silently propagate.
 
 ## Quick self-check before you act
 
+- [ ] About to build a runbook/skill, or improvise a procedure? → Listed the bundled skills first
+      (`skills_list`); building only the delta, and naming the vendor skill if both apply.
 - [ ] About to assert a fact? → Grounded it against live / the vendor doc first.
 - [ ] About to write config? → Baseline captured; built from a golden object; linted; inert; render gate
       planned; verifying against the consuming object; alarms checked.

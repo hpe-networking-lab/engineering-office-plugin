@@ -37,7 +37,7 @@ set.
 
 | Skill | What it does | Risk |
 |---|---|---|
-| **eo-guardrails** | The eight always-on reflexes + change/validation gates. | grounding |
+| **eo-guardrails** | The nine always-on reflexes + change/validation gates. | grounding |
 | **connector-setup** | Stand up your OWN hpe-networking MCP connector (Docker, HTTP, your creds) — checked one-command setup. | setup |
 | **onboarding-shakedown** | Guided READ-ONLY first run to prove a new setup works end to end. | read-only, setup |
 | **inventory-reconcile** | Regenerate inventory from live (your connectors) and flag drift. | read-only |
@@ -124,3 +124,5 @@ and added **onboarding-shakedown** (guided read-only first run). 13 skills. Reti
 `0.10.0` — added **aos10-gateway-tunnel-build** (AOS 10 Mobility Gateway + tunnel-mode WLAN runbook). 14 EO skills.
 
 `0.11.0` — added **aos8-to-aos10-central-migration** (the AOS 8 → AOS 10 campus-AP migration runbook). 15 EO skills.
+
+`0.12.0` — new guardrail reflex: **check the shelf before you build** (`skills_list` first; build only the delta).

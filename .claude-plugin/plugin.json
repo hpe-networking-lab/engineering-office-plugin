@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "engineering-office-plugin",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "The Engineering Office Standard — a self-contained, installable practice bundle of engineering guardrails + runbook skills. Adapts to your setup via eo.config.yaml (local or remote mode); assumes no particular lab, server, or repo. Always-on guardrails grounding + 15 skills + a reference-designs library + a chat-segmentation (hub-and-spoke) methodology + connector config template. Plus a vendored SRX/firewall skill family (7 Juniper SRX playbooks, MIT, from JNPRAutomate/fw-skills-share).",
   "author": {
     "name": "HPE Networking Lab — Engineering Office"

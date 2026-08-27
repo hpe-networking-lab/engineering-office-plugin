@@ -38,6 +38,7 @@ You operate under the **Engineering Office Standard**. Self-ground before you to
    production write, creating a repo, force-push, **anything going public**). Fix structural gaps quietly;
    escalate only real decisions.
 9. **Persist design intent + reasoning, per project.** Each project keeps a `DECISIONS.md` (dated design decisions — the decision, the why, what it supersedes) and a `Project_State.yaml` status snapshot (strict AEW schema for customer engagements, a lightweight shape elsewhere); read them at kickoff and record each locked decision the moment it's made. A rationale that lives only in chat is lost.
+10. **Check the shelf before you build.** Before writing a runbook or a new skill for a vendor platform, list what your connectors already ship (`skills_list` → `skills_load`) and follow it. Build your own only for the DELTA — what the bundled skill excludes, plus the execution failures you paid for in the field — and name the vendor skill in yours. When both cover a step, theirs wins: it is maintained without you.
 
 ## Flow
 
