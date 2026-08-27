@@ -20,6 +20,25 @@ cluster and tunnel-anchoring work is a *different* problem — use `aos10-gatewa
 
 ---
 
+## FIRST: run the vendor's assessment skill, not this one
+
+If the `hpe-networking` MCP connector is available, call `skills_list` → `skills_load('aos-migration')`
+**before** anything here. That bundled skill is the ASSESSMENT AND PLANNING half and is far more thorough
+than anything to hand-write: a full `/md` hierarchy walk, per-object translation rules, feature-parity
+REGRESSION/DRIFT/INFO findings, a target-architecture questionnaire, a hierarchy mapping, a per-object
+disposition matrix, and an ordered Central API call sequence.
+
+**This skill is the EXECUTION AND TRIAGE half.** It starts where that one stops — at the point where you
+are actually claiming devices, creating groups, running `ap convert`, and staring at an AP that is online
+and silent. The vendor skill's own scope statement excludes controller plumbing and execution; it
+describes the cutover phases as "operator action items", and it does not cover the hybrid-tenant
+mechanics, the config-push rejections, or the post-conversion failure modes below.
+
+Rule of thumb: **plan with theirs, execute with this one.** If both cover a step, theirs wins — it is
+maintained by the connector authors and improves without us.
+
+---
+
 ## 0. Two rules that prevent most of the pain
 
 1. **Read the vendor procedure first, then confirm it in the lab.** The lab confirms the doc; it does not
