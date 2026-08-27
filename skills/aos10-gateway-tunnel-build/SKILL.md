@@ -300,12 +300,25 @@ vendor doc that the metric indicates the thing you want (see §6 — `show ap ac
 
 Recreating a WLAN to restore a create-only field is routine (§8). These will bite you during it:
 
-- **"Create as a local profile" is a create-time decision.** Leave it unticked and you get a SHARED
-  (library) profile. A SHARED WLAN **cannot reference a site-LOCAL server group** —
-  `Cannot find in library '<name>' of type 'aruba-auth-server-group' referred in '<ssid>' of type
-  'aruba-wlan'`. If the WLAN you are replacing was site-local and pointed at site-local AAA objects, tick
-  the box; otherwise you must also promote the AAA objects to the library, which breaks the
-  "lab override dies at the site boundary" pattern.
+- **A tunnel-mode WLAN MUST be a Library (SHARED) profile. This is documented, not incidental.**
+  New Central config guide, *AOS-10 APs and Mobility Gateways Configuration*: "You must create tunnel-mode
+  WLAN profiles in the **Library** and assign them to the **device groups** containing the APs that service
+  the ESSID… Future updates will add support to assign WLAN profiles to any scope in the hierarchy,
+  including Global, Site Collections, Sites, Devices, and Device Groups."
+  In the Create WLAN dialog this shows up as: tick **"Create as a local profile"** and the **Tunnel** and
+  **Mixed** radio buttons DISAPPEAR — Bridge becomes the only forwarding mode. Untick it and they return.
+  **Consequence:** you cannot have a tunnel-mode WLAN *and* site-local AAA references. A SHARED WLAN
+  **cannot reference a site-LOCAL server group** — `Cannot find in library '<name>' of type
+  'aruba-auth-server-group' referred in '<ssid>' of type 'aruba-wlan'`. So any "lab override that dies at
+  the site boundary" pattern is unavailable for tunnel SSIDs: promote the AAA objects to the Library, and
+  label them so they are removed when the gateway moves.
+  **Also assign it where the doc says.** Assignment belongs on the DEVICE GROUP containing the APs. Site
+  scope may appear to work — it did in a real build — but the doc lists site-level assignment as a FUTURE
+  capability, so it is not guaranteed across upgrades. Call the deviation out rather than relying on it.
+- **Tunnel is the prescribed mode once a gateway is in the design.** Same doc: "You **must** select
+  **Tunnel** for AP and Mobility Gateway deployments. The **Bridge** option is for AP-only deployments.
+  The **Mixed** option is for AP and Mobility Gateway, but allows some VLAN to be trunked to the switching
+  fabric based on user session VLAN assignment." Bridge is the controller-less/AP-only architecture.
 - **The Primary Server drop-down lists only library/shared auth servers.** Site-local ones do not appear,
   even at that site's own scope. Use the inline **New Authentication Server** link.
 - **WPA2-Enterprise (and WPA-Enterprise, Both, Dynamic WEP) are greyed out** until you **uncheck the 6 GHz
@@ -319,6 +332,33 @@ Recreating a WLAN to restore a create-only field is routine (§8). These will bi
   `<SSID>_<digits>_` (with `802.1X Authentication Profile`, default role and a `..._auth_svg` server group)
   and `show switches` Config ID advances. If Config ID moves but no AAA profile appears, the binding did
   not take.
+
+---
+
+## 9c. Guest captive portal — what AOS 10 does and does not offer
+
+Do NOT reason about this from the UI drop-downs; it is documented and the docs are unambiguous.
+
+- **The AP is the authenticator; the gateway is an authentication PROXY.** AOS 10.x tunnel-mode doc: "APs
+  function as authenticators and send authentication and accounting requests to the Gateway cluster…
+  The AP acts as an authenticator… The Gateway acts as an authentication proxy." Captive-portal
+  interception and redirect happen at the AP even for a tunnelled SSID.
+- **There is NO on-prem splash-page host in AOS 10 campus.** The AP guest doc lists exactly two supported
+  splash page profiles: **External Captive portal** and **Cloud Guest**. Neither is AP-hosted. The
+  `securelogin.hpe.com` cert on the AP group terminates the intercepted TLS session — it does not serve
+  portal content. The gateway does not host a portal either (see next point).
+- **The gateway captive-portal profile you will find in the CLI is the BRANCH GATEWAY path.** `show aaa
+  authentication captive-portal` returns a `default` profile on a campus Mobility Gateway and the web
+  server has a Captive Portal Certificate — this is misleading. The Central doc for configuring it is
+  scoped to "a group that contains at least one **Branch Gateway**" and its video is
+  `l3-cptv-prtl-bgw-adv-mode.mp4` (bgw = Branch GateWay). It is SD-Branch, not campus tunnel-mode WLAN.
+- **New Central has three WLAN Security Levels: Enterprise, Personal, Open.** There is no "Visitors"
+  level. Cloud Guest attaches to "Visitors" in CLASSIC Central only. So on New-Central-managed devices the
+  guest portal is **Central NAC** or **External Captive Portal** — nothing else.
+- **A Central-NAC SSID cannot be localised at any scope.** Both API and UI reject it identically:
+  `For LOCAL SSID, Can not use Central NAC server as the server group.` Plan for it: a guest SSID on
+  Central NAC can never take a site-level override (VLAN or otherwise). If the deployment needs a per-site
+  guest VLAN, that VLAN must exist on the wired side, or the portal must be External.
 
 ---
 
@@ -353,3 +393,19 @@ that produced the wrong conclusion. That line is now corrected.
 Standing lesson this file exists to prevent: **if every documented prerequisite reads green and the
 product still does not work, suspect your own setup — not the product — and never commit "X cannot be
 done" to a design record without a named mechanism and an explicit re-test trigger.**
+
+**Third pass, same day — grounded in the vendor docs after the Human rejected trial-and-error findings.**
+§9b's shared-vs-local rule and §9c (guest captive portal) were originally derived by clicking through the
+UI. That produced the right answers twice and a WRONG answer once (an invented "AP-hosted portal" option,
+read out of an ambiguous doc sentence). All three are now sourced:
+
+- new-central `get-started/cfg-guides-ap-gw.htm` — tunnel WLANs must be Library profiles assigned to the
+  AP device group; Tunnel is mandatory for AP+Mobility Gateway deployments; Security Levels are
+  Enterprise / Personal / Open only.
+- aos10x `cfg/cfg-wlan-overlay.htm` — APs are authenticators, the gateway is an authentication proxy.
+- aos10x `cfg/aps/conf_guest_ssids.htm` — the only two splash page profiles are External and Cloud Guest.
+- aos10x `cfg/security/authentication/l3-cptv-prtl-conf.htm` — the gateway captive-portal profile is the
+  Branch Gateway path.
+
+**Do not report a capability question from UI presence or absence.** A drop-down tells you what this
+tenant exposes today; the doc tells you what the product does and why. Read §0 and go to the doc first.
