@@ -51,6 +51,7 @@ set.
 | **mist-org-migrate** | Consolidate one Mist org into another (clone → release/claim → interop gate), by ID. | change, gated |
 | **proxmox-ml110-provision** | Bare-metal Proxmox on HPE Gen11 via iLO Redfish (worked example + method). | change, gated |
 | **aos10-gateway-tunnel-build** | AOS 10 Mobility Gateway + tunnel-mode WLAN: system-IP gate, onboarding order, cluster/bucket-map, healthy-tunnel signature. | change, gated |
+| **aos8-to-aos10-central-migration** | Controller-managed AOS 8 campus APs to AOS 10 / New Central: entitlement, group + site gates, ap convert, config-model rebuild. | change, gated |
 
 ### SRX / firewall family (vendored — separate from the guardrails)
 
@@ -74,7 +75,7 @@ engineering-office-plugin/
 ├── config/eo.config.example.yaml   # copy to eo.config.yaml — mode, paths, standards_source, connectors
 ├── grounding/PROJECT-INSTRUCTIONS.md  # portable session grounding
 ├── reference-designs/                 # Mist template playbook, WLAN/switch/site/RF templates, interop designs
-├── skills/<14 EO skills + 7 vendored SRX skills>/SKILL.md
+├── skills/<15 EO skills + 7 vendored SRX skills>/SKILL.md
 ├── .mcp.json.example                  # connector endpoints template (no secrets)
 ├── ATTRIBUTION-fw-skills-share.md   # SRX family provenance (MIT)
 ├── SETUP.md   README.md   LICENSE
@@ -121,3 +122,5 @@ and added **onboarding-shakedown** (guided read-only first run). 13 skills. Reti
 `0.9.0` — vendored the **SRX / firewall family** (7 Juniper SRX playbooks from JNPRAutomate/fw-skills-share, MIT) as a separate read/plan-first family; device-touching deploy skills excluded.
 
 `0.10.0` — added **aos10-gateway-tunnel-build** (AOS 10 Mobility Gateway + tunnel-mode WLAN runbook). 14 EO skills.
+
+`0.11.0` — added **aos8-to-aos10-central-migration** (the AOS 8 → AOS 10 campus-AP migration runbook). 15 EO skills.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+- New skill **aos8-to-aos10-central-migration** — the controller-managed AOS 8 campus AP → AOS 10 / New Central migration runbook: cluster-type fork (hybrid vs pure New Central), the four prerequisite gates (GreenLake claim + valid subscription, persona, group, site), creating the AOS 10 group via Classic `configuration/v3/groups` so the device-collection actually populates, the controller-side `ap convert` sequence, the three things that leave a converted AP silent (site, WLAN disabled-by-default, the `no <field>` push rejections), the scope/precedence model, RADIUS/802.1X gotchas, and the green verification signature.
+- Includes the corrections that superseded earlier conclusions from the same effort: the firmware-floor theory, "dmo needs TAC", "site scope is broken", and "AP firmware upgrade is Select-Availability gated" were all disproved.
+
 ## 0.10.0
 - New skill **aos10-gateway-tunnel-build** — HPE Aruba AOS 10 Mobility Gateway + tunnel-mode WLAN: the system-IP-must-be-a-VLAN gate (loopback silently breaks AP tunnel anchoring), the New Central onboarding/prerequisite order, the Classic local-override Reset Config step, cluster/bucket-map facts, create-only forwarding mode, and the healthy-tunnel verification signature. Includes the correction that `show ap active` is NOT the done-test on AOS 10.
 - Skills are now inventoried by the practice's drift check, so a skill that contradicts the canonical lessons record surfaces as drift instead of rotting.
