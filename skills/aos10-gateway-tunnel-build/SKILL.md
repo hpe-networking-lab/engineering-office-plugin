@@ -338,6 +338,18 @@ does **not** mean the device rendered it.
 - Use **CLI Viewer > Candidate Config** at device scope to see the exact CLI Central intends to push, and
   diff it against the device's running config.
 
+**`central_get_*` can fail to return an object that EXISTS.** Verified 2026-08-28: a role created via
+`central_manage_roles` (HTTP 200, `SUCC_001`) was absent from `central_get_roles` at site, collection,
+global AND library scope — yet re-creating it returned
+`Cannot create duplicate config, Module = Role where name='X' already exists in Library`. The write had
+worked; the read was lying.
+
+> **Existence probe that actually works: try to CREATE it again.** A duplicate-name error is proof the
+> object exists. A clean create means it did not. This is an executable check — prefer it to a read-back
+> whenever a config-model write "seems" to have vanished, and never conclude "the write silently failed"
+> from a `get` alone. (Corollary: also check page size — a default 25-item page against 59 objects looks
+> exactly like a missing object.)
+
 **Write to the scope where the object is actually assigned.** Updating the *library* copy of a WLAN does
 nothing to the device. Find the real assignment in the profile list's **"Assigned Device Scope"** column
 or the profile's **References** tab.
