@@ -152,6 +152,55 @@ Do NOT author configuration in Classic. Classic is used only for this removal ac
 
 ---
 
+## 3b. Carrying a tagged client VLAN out of the gateway uplink
+
+A tunnel-mode WLAN whose client VLAN never reaches the wire produces a VAP that **appears and vanishes
+on a roughly 1 Hz cycle** — the SSID flaps in the client's list. That is the gateway taking the VAP out
+of service because it cannot place clients on the VLAN. It is NOT a DHCP failure (a DHCP failure leaves
+the SSID up with no address).
+
+Three separate things must all be true. Missing any one gives the same flap:
+
+1. **The VLAN must be assigned to the MOBILITY_GW persona**, not only CAMPUS_AP. A VLAN assigned to
+   `CAMPUS_AP` at a site collection is invisible to the gateway. Check
+   `central_get_config_assignments` for `profile-type: layer2-vlan` and the device-function column.
+2. **The VLAN must be enabled.** Compare against VLAN 1's object: a working VLAN carries `"enable": true`.
+   A VLAN created by assignment alone may have no enable flag at all.
+3. **The uplink port must be a TRUNK.** This is the one most often waved away.
+
+### The uplink VLAN mode is real, not cosmetic
+
+Monitoring reporting `portType: Access, vlan: 1` means the port **untags everything** — it is not
+"just showing the native VLAN". Per the VSG LAN-interface documentation:
+
+> Access — "allow the LAN port to carry traffic only for the VLAN to which they are assigned. All
+> transmitted and received traffic on the port is untagged."
+> Trunk — "allow the LAN port to carry traffic for multiple VLANs... Native VLAN... Allowed VLAN"
+
+An access-mode uplink is physically incapable of emitting a tagged client VLAN. Confirm at the switch:
+`show mac-address-table vlan <id>` on the upstream switch returning **"No MAC entries found"** while
+clients are associating is proof the gateway never sent a tagged frame.
+
+### The object and the field name
+
+`ethernet-interfaces`, LOCAL at the gateway DEVICE scope. The trunk field is **`trunk-vlan-ranges`** —
+there is no `allowed-vlans` node under `switchport`, and guessing that name produces a YANG parse error:
+
+```json
+"switchport":    {"interface-mode": "TRUNK", "native-vlan": 1, "trunk-vlan-ranges": ["1", "3115"]}
+"trusted-vlans": ["1", "3115"]
+```
+
+Keep **native VLAN 1** so untagged management traffic is unaffected — the conversion is then a non-event
+(verified: 0% packet loss across the change on both the gateway and the upstream 6300M).
+
+**Learn the accepted payload shape on an UNUSED port first.** The gateway's other ports are typically
+down and unused; write to one of those, read it back, then apply the proven shape to the live uplink.
+The API validates server-side, so a wrong field name is rejected without reaching the device — but a
+*valid but wrong* payload on the only uplink strands an ACP-locked box that has no CLI to recover it.
+
+---
+
 ## 4. What is device-owned vs Central-managed
 
 - All ZTP ports land in **VLAN 4094**; the ZTP uplink is a DHCP client there. This is normal.
@@ -214,6 +263,89 @@ happily show an object at every scope_id. Confirm in the UI.
 `show configuration failure` first: >0 means a command was genuinely rejected (fix the config); 0 means
 nothing was rejected — look in `show log errorlog` for `cfgm_rollback_timeout` / `cfgm_rollback_is_bad_config`,
 which is the device auto-reverting because the ACP web-socket did not re-establish inside the rollback window.
+
+---
+
+## 5b. HOW to actually read an ACP-locked gateway — the mechanics S5 assumes
+
+Section 5 tells you to read the device. This section exists because that repeatedly does not happen:
+every obvious route returns empty or null, it looks like "no read access exists", and you fall back to
+Central reads and start poking. **All three dead ends have answers.**
+
+### The gateway SSH shell needs a PTY
+
+Plain SSH to an AOS 10 gateway returns an EMPTY result. This has been mis-recorded as "SSH does not
+work, use central_show_commands". Wrong on both halves. **Allocate a pty with `-tt` and it works:**
+
+```bash
+PW=$(cat /lab/.secrets/<gw-cred-file>)
+sshpass -p "$PW" ssh -tt \
+  -o StrictHostKeyChecking=no \
+  -o KexAlgorithms=+diffie-hellman-group14-sha1 \
+  -o HostKeyAlgorithms=+ssh-rsa \
+  -o PubkeyAuthentication=no \
+  admin@<gw-ip> "show switches"
+```
+
+An ACP-locked gateway refuses `configure terminal` and `write memory` — but **every `show` command
+works.** Read-only is exactly what diagnosis needs. "ACP-locked" is not "unreadable".
+
+### central_show_commands returns null for gateways
+
+Its parameters are `serial_number`, `device_type`, `commands` — *not* `serial`. Passing the wrong name
+returns `null` rather than an error. Even with correct parameters it returned `null` for every
+device_type tried against a 9004. **A `null` from a tool means "wrong call or unsupported", never "the
+capability does not exist" — check the schema before concluding you have no instrument.**
+
+### show configuration failure is a HISTORY, newest first
+
+It accumulates (24+ entries observed). **Read the HEAD, not the tail.** Tailing it shows the OLDEST
+failures and sends you chasing errors that were resolved hours ago.
+
+Correlate every entry's ConfigId against the live one in `show switches`:
+
+```
+show switches  ->  Configuration State: CONFIG FAILURE(118)   Config ID: 119
+```
+
+Config ID **119** with the newest failure at **118** means the latest push SUCCEEDED — the state string
+is a sticky label naming the last *failed* id, not current health. Central flattens this whole history
+into a single `topPriorityIssue` string, mixing stale and current, which is exactly how hours get spent
+on an error that no longer exists.
+
+### The compiled ACL is named sys_policy_<ROLE>, not <policy-name>
+
+Central compiles an intent-based policy into a device ACL named after the **role**. So:
+
+```
+Message: Unknown access-list 'MyPolicyName'
+```
+
+may be **spurious** — Central emits a raw `access-list session <policy-name>` binding alongside the
+compiled one, and the device rejects the former while correctly applying the latter. Do not act on this
+error until you have checked what the role actually holds:
+
+```
+show rights <ROLE>                              # position list + ACE table of sys_policy_<ROLE>
+show running-config | include "ip access-list session"
+show running-config | include <policy-name>     # empty => never persisted; push-time only
+```
+
+If `sys_policy_<ROLE>` contains your intended rules, **the policy is live** regardless of that failure line.
+
+### A policy with no substantive rules emits NO ACL
+
+A policy whose only rule is `role -> any: permit` compiles to zero ACEs. The ACL is never created while
+the role still references it by name — a self-inflicted `Unknown access-list`. **A placeholder policy
+must contain at least one real match**; a deny to an RFC 5737 documentation prefix such as
+`192.0.2.0/24` is a safe non-empty no-op.
+
+### Neutralising a policy without deleting it
+
+Never delete a policy a role references — the role keeps a dangling reference the merge-only API cannot
+clear, and **every subsequent push to that device fails**. To make a policy harmless in place, repoint
+its deny destinations at RFC 5737 documentation prefixes (`192.0.2.0/24`, `198.51.100.0/24`,
+`203.0.113.0/24`). The ACL stays non-empty and renders; it blocks nothing.
 
 ---
 
