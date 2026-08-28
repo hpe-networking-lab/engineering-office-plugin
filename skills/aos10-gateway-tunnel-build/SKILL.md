@@ -472,35 +472,46 @@ proves only that it should.
 
 ---
 
-## 5d. How additional client VLANs get admitted to the AP↔gateway tunnel
+## 5d. Additional client VLANs on a shared AP↔gateway tunnel — what is established, and what is NOT
 
-One GRE tunnel carries MANY client VLANs — they are 802.1Q-tagged inside it. If you conclude "gre0 only
-carries one VLAN", that is a symptom, not a platform limit (multi-VLAN tunnel mode is standard campus
-design — see the stay-on-rails gate about conclusions that imply the product works backwards).
+One GRE tunnel carries MANY client VLANs; they are 802.1Q-tagged inside it. If you conclude "gre0 only
+carries one VLAN", treat that as a symptom, not a platform limit — multi-VLAN tunnel mode is standard
+campus design.
 
-**The admission mechanism is the CLUSTER, not the WLAN and not the AP.** Per the Central docs:
-> "the VLANs present in the primary and secondary clusters are **learned by the APs** and are tagged in
-> the GRE tunnels" · "Each tunneled client is assigned a VLAN **which is present on all the Gateways
-> within the primary cluster**"
+**Doc-established requirement (Tunnel Forwarding Mode page):**
+> "Each tunneled client is either statically or dynamically assigned to a VLAN, **which is present on all
+> the gateways within the primary cluster**." · "the user VLANs are centralized and reside within each
+> cluster… Each gateway within a cluster shares management VLAN, user VLANs, and associated IP networks."
 
-So a VLAN that exists on the gateway, is enabled, addressed, trunked on the uplink and present on the
-datapath tunnel ports can STILL be unusable by a tunnelled client — because the AP never learned it.
+**Also doc-established: a SINGLE-gateway cluster is a supported, documented topology** —
+> "This example uses a single gateway to simplify the datapath of each tunneled client."
 
-**The instrument nobody reaches for — run it ON THE AP:**
-```
-show vlan                       # the AP's Vlan Mapping Table = what it LEARNED from the cluster
-show ap debug stm-bucketmap     # UAC list + bucket map (see the single-node caveat in §7)
-```
-An **empty** Vlan Mapping Table on the AP means no cluster VLANs were learned. Native/untagged traffic
-still works, which is why VLAN 1 SSIDs behave perfectly while every other VLAN gets
-`a2g-sta-up` → ~100 ms → `a2g-sta-down` / `out-of-service: TUNNEL_DOWN`.
+So `ISOLATED (Leader)` / one member is **not** inherently disqualifying, and a VLAN that is defined,
+enabled, addressed and on the tunnel ports of that one gateway satisfies the stated requirement.
 
-Check the cluster state at the same time — `show lc-cluster group-membership`. A cluster reporting
-`ISOLATED (Leader)` is worth suspicion here: VLAN advertisement to APs is a cluster function.
+### ⚠ Two dead ends — do NOT read these as evidence (corrected 2026-08-28)
+- **The AP's `show vlan` "Vlan Mapping Table" is the NAMED-VLAN table** (`VLAN Name → VLAN ID`). If the
+  deployment does not use Named VLANs it is empty **by design**, and its emptiness says nothing about
+  what the tunnel carries. An earlier revision of this skill claimed an empty table meant "the AP learned
+  no cluster VLANs" — **that was wrong** and is withdrawn.
+- **The cluster VLAN probe is peer detection, not AP advertisement.** It is a Layer-2 unicast
+  (etype `0x88b5`) used to determine whether a *peer gateway* is L2- or L3-connected. On a single-node
+  cluster an empty probe table is expected, not a fault.
+- Beware the citation trap that produced both: the "VLANs present in the clusters are **learned by the
+  APs** and are tagged in the GRE tunnels" language is on the **Mixed Forwarding Mode** page. Do not
+  carry it onto tunnel mode without checking the tunnel-mode page itself.
 
-*Status: mechanism is doc-grounded; the empty-mapping-table observation is device-verified. That the
-isolated cluster state is the CAUSE of the empty table is a hypothesis, not yet proven — confirm before
-acting on it.*
+### Still open
+No AP-side command is yet known that enumerates the VLANs a tunnel actually carries. Until one is found,
+"the AP did not learn VLAN n" is an untested hypothesis — not a finding. The observable symptom set is
+`a2g-sta-up` → ~100 ms → `a2g-sta-down` with `out-of-service: TUNNEL_DOWN`, while every inspectable
+object (VLAN defined/enabled/addressed, uplink trunked, datapath tunnel ports, overlay binding, AAA
+profile default VLAN) reads correct.
+
+**Governing rule, learned the hard way on this exact problem: an empty table is not evidence until you
+know what populates it.** Several hours went into reading meaning into empty tables here — the switch MAC
+table, a tracebuf column, the named-VLAN table — each of which was empty for reasons unrelated to the
+fault.
 
 ## 6. Verification signature of a HEALTHY tunnel
 
