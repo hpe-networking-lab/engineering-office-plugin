@@ -472,6 +472,36 @@ proves only that it should.
 
 ---
 
+## 5d. How additional client VLANs get admitted to the AP↔gateway tunnel
+
+One GRE tunnel carries MANY client VLANs — they are 802.1Q-tagged inside it. If you conclude "gre0 only
+carries one VLAN", that is a symptom, not a platform limit (multi-VLAN tunnel mode is standard campus
+design — see the stay-on-rails gate about conclusions that imply the product works backwards).
+
+**The admission mechanism is the CLUSTER, not the WLAN and not the AP.** Per the Central docs:
+> "the VLANs present in the primary and secondary clusters are **learned by the APs** and are tagged in
+> the GRE tunnels" · "Each tunneled client is assigned a VLAN **which is present on all the Gateways
+> within the primary cluster**"
+
+So a VLAN that exists on the gateway, is enabled, addressed, trunked on the uplink and present on the
+datapath tunnel ports can STILL be unusable by a tunnelled client — because the AP never learned it.
+
+**The instrument nobody reaches for — run it ON THE AP:**
+```
+show vlan                       # the AP's Vlan Mapping Table = what it LEARNED from the cluster
+show ap debug stm-bucketmap     # UAC list + bucket map (see the single-node caveat in §7)
+```
+An **empty** Vlan Mapping Table on the AP means no cluster VLANs were learned. Native/untagged traffic
+still works, which is why VLAN 1 SSIDs behave perfectly while every other VLAN gets
+`a2g-sta-up` → ~100 ms → `a2g-sta-down` / `out-of-service: TUNNEL_DOWN`.
+
+Check the cluster state at the same time — `show lc-cluster group-membership`. A cluster reporting
+`ISOLATED (Leader)` is worth suspicion here: VLAN advertisement to APs is a cluster function.
+
+*Status: mechanism is doc-grounded; the empty-mapping-table observation is device-verified. That the
+isolated cluster state is the CAUSE of the empty table is a hypothesis, not yet proven — confirm before
+acting on it.*
+
 ## 6. Verification signature of a HEALTHY tunnel
 
 Gateway:
@@ -546,8 +576,11 @@ investigation on the strength of one cold packet.
   deviation out.
 - **The cluster member IP MUST equal the gateway's system IP.** A mismatch gives
   "self-ip X not present ... cluster disabled". Restarting the device does NOT fix a member-IP mismatch.
-- The **bucket map published by the cluster leader** assigns each client's UDG. An all-zero bucket map
-  means no client will ever anchor, even with the tunnel up.
+- The **bucket map published by the cluster leader** assigns each client's UDG.
+  **CORRECTED 2026-08-28:** an all-zero bucket map is NOT a fault on a single-node cluster. The values are
+  UAC *indices*, so with one gateway every bucket is `00` = "UAC 0" = the only gateway. Verified with two
+  tunnelled SSIDs carrying authenticated clients while the map read all zeros end to end. Only treat zeros
+  as a fault when the cluster has MORE THAN ONE member and you expect a spread.
 - A gateway MAC belongs to exactly one cluster; emptying `ipv4-gateways` does not release it — the old
   cluster profile must be deleted.
 
