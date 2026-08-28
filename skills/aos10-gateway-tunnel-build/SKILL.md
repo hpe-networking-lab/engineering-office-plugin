@@ -501,17 +501,34 @@ enabled, addressed and on the tunnel ports of that one gateway satisfies the sta
   APs** and are tagged in the GRE tunnels" language is on the **Mixed Forwarding Mode** page. Do not
   carry it onto tunnel mode without checking the tunnel-mode page itself.
 
-### Still open
-No AP-side command is yet known that enumerates the VLANs a tunnel actually carries. Until one is found,
-"the AP did not learn VLAN n" is an untested hypothesis — not a finding. The observable symptom set is
-`a2g-sta-up` → ~100 ms → `a2g-sta-down` with `out-of-service: TUNNEL_DOWN`, while every inspectable
-object (VLAN defined/enabled/addressed, uplink trunked, datapath tunnel ports, overlay binding, AAA
-profile default VLAN) reads correct.
+### ✅ SOLVED — a tunnel-mode SSID CANNOT use the AP's UNDERLAY VLAN
 
-**Governing rule, learned the hard way on this exact problem: an empty table is not evidence until you
-know what populates it.** Several hours went into reading meaning into empty tables here — the switch MAC
-table, a tracebuf column, the named-VLAN table — each of which was empty for reasons unrelated to the
-fault.
+**Root cause, device-proven 2026-08-28.** An overlay (tunnel-mode) SSID assigned the same VLAN the AP
+uses as its own underlay is **rejected at the AP**. Symptom set:
+`a2g-sta-up` → ~100 ms → `a2g-sta-down`, `out-of-service: TUNNEL_DOWN`, and an SSID that flaps at ~1 Hz.
+
+**The instrument that names it in one line — run it ON THE AP:**
+```
+show ap debug vlan          # "VLAN Assignment Failure Table": time / mac / bssid / REASON / description
+```
+Evidence from the case: **17 failure entries, all the same reason, every one while the SSID sat on the
+underlay VLAN. ZERO entries after moving it to a dedicated client VLAN.**
+
+**Consequence for design:** give tunnelled SSIDs their own client VLAN. Do not put one on the VLAN the
+APs are managed on. If a tunnelled SSID "works on VLAN 1 and nowhere else", you have the diagnosis
+backwards — VLAN 1 is the invalid case, not the control.
+
+**These were NOT the fix** (all were changed while chasing it, and none mattered): the gateway
+`vlan-interface`, the policy scope, the VLAN's IP address, the role ACL, and a full WLAN rebuild.
+
+**`gre0` showing a single VLAN is not the limit** — it still reads `VLANs 1` while the dedicated client
+VLAN forwards correctly. Treat it as a symptom, never a constraint.
+
+### ⚠ Unexplained, do not assume safe
+An **802.1X** overlay SSID on the underlay VLAN was observed working (client authenticated, anchored
+`dtunnel`) and never appeared in the VLAN Assignment Failure Table, while an **Open / cloud-NAC** overlay
+SSID on the same VLAN failed every time. Why the two behave differently is NOT established. Do not
+conclude the underlay VLAN is safe for 802.1X tunnelled SSIDs on the strength of one success.
 
 ## 6. Verification signature of a HEALTHY tunnel
 

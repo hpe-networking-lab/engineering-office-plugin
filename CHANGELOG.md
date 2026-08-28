@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.17.0
+- **aos10-gateway-tunnel-build §5d: root cause established.** A tunnel-mode (overlay) SSID cannot use the AP's UNDERLAY VLAN - it is rejected at the AP (`a2g-sta-up` -> ~100ms -> `a2g-sta-down`, `TUNNEL_DOWN`, ~1 Hz SSID flap). `show ap debug vlan` (VLAN Assignment Failure Table) names the reason in one line: 17 failures on the underlay VLAN, zero after moving to a dedicated client VLAN. Also records what was NOT the fix, and flags an unexplained difference in 802.1X behaviour on the underlay VLAN.
+
 ## 0.16.0
 - Guardrail: **put the condition IN the artifact that travels.** Prerequisites stated only in the surrounding conversation are lost the moment a block is pasted onward. Re-read the artifact alone before handing it over.
 
