@@ -111,6 +111,67 @@ JSON first.
 
 ---
 
+## 1c. `cluster-scope-id` — use the SITE, and never edit the binding in place
+
+**Trap that takes an SSID off air with no in-place recovery.**
+
+Aruba's own reference workflow (`central-python-workflows/tunneled-ssid-overlay`,
+`wlan_overlay_profiles.yaml`) carries this comment:
+
+```
+# Change the cluster-scope-id to match your AP Device Group
+```
+
+**Following it broke a working SSID.** Setting `cluster-scope-id` to the AP **device group**
+made `POC-COAONLINE` vanish from `show ap bss-table` entirely — the other four SSIDs on the
+same AP were unaffected. Central renders the field red (it knows the value is invalid) but
+**accepts the write anyway**.
+
+Use the **SITE** scope id — the value a known-working tunnel SSID on the same cluster already
+has. Verify against a working sibling before writing:
+
+```
+central_get_overlay_wlan(detailed=True)   # compare gw-cluster-list[].cluster-scope-id
+```
+
+### The binding is create-only in BOTH the API and the UI
+
+§1b says the API is unusable for changing it. The UI is **also** locked, which is not obvious:
+
+- **API update** fails with `Profile not found in library for
+  aruba-aaa-captive-portal/sys_cnac_<ssid>` — updating `overlay-wlan` revalidates every
+  referenced profile, and the Central NAC captive portal is a **system-generated** object that
+  is not in the library view that path resolves against. A tunnel SSID with **no** captive
+  portal updates fine; one **with** a portal cannot be updated at all.
+- **UI**: Traffic Forwarding Mode and Primary/Secondary Gateway Cluster are greyed out at
+  **both** site scope and Library scope. The control is a `DIV`, not a form input — the
+  dropdown will not open and `form_input` is rejected.
+
+### Repair: delete and recreate (the only route)
+
+1. **Baseline everything first** — full WLAN profile, `overlay-wlan`, and every
+   `config-assignment` naming the SSID.
+2. `central_manage_overlay_wlan` delete, then `central_manage_wlan_profile` delete.
+3. Recreate the WLAN as a **library object** (no `object_type` / `scope_id`).
+4. Recreate `overlay-wlan` with the correct `cluster-scope-id`.
+5. Re-assign **both** `wlan-ssids` and `overlay-wlan` to `CAMPUS_AP` at the site.
+
+**The rebuild regenerates the gateway AAA profile with a NEW id**
+(`<SSID>_<epoch>_`). Anything referencing the old id by name must be re-pointed.
+
+### `out-of-service: TUNNEL_DOWN` is why a broken tunnel SSID "flaps"
+
+A tunnel-mode WLAN carries `out-of-service: TUNNEL_DOWN`. When the tunnel cannot service the
+SSID the AP pulls the VAP and retries, giving a ~1 Hz appear/vanish cycle in the client's
+network list. **That flap is a symptom of tunnel unserviceability, not a fault in itself** —
+do not debug the VAP; find out why the tunnel cannot carry that SSID's VLAN.
+
+Distinguish it from a client-side problem with `show ap bss-table`: the `tot-t` column is the
+BSS uptime. **If `tot-t` is large and unbroken, the SSID never went down** and what the user
+sees is a client failing to associate, not a flapping VAP.
+
+---
+
 ## 2. Build order (New Central) — prerequisites BEFORE anything destructive
 
 Per the onboarding doc, create these first. Skipping any of them can strand the gateway.
