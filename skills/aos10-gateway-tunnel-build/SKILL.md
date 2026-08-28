@@ -218,6 +218,23 @@ The API validates server-side, so a wrong field name is rejected without reachin
 
 ## 5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
 
+**`central_show_commands` parameter shape — the enum differs BETWEEN tools.** Getting it wrong returns
+a 422 that is easy to read as "this doesn't work for APs" and to escalate to a human:
+
+```
+central_get_devices     device_type = ACCESS_POINT | SWITCH | GATEWAY     (upper, singular)
+central_show_commands   device_type = aps | cx | aos-s | gateways         (lower, plural)
+                        serial_number = <serial>      commands = "<one string>"   (NOT a list)
+```
+It works fine for APs. A chat concluded `central_show_commands` "returns null for APs", declared the AP
+the one device it could not instrument, and asked the operator for credentials — the call shape was wrong.
+
+**Tunnel mode: absence of client MACs on the client VLAN at the SWITCH is EXPECTED, not a fault.** Client
+traffic rides the AP→gateway GRE tunnel; the access switch never sees client MACs on that VLAN from the
+AP port. With no client associated there is nothing to see at all. Before diagnosing "zero frames on
+VLAN n", confirm a client is actually associated (`show ap association` on the AP, `show user-table` on
+the gateway) — otherwise you are debugging an empty network.
+
 **And when a push FAILS, the error names a device object — go read the device first.** Central's
 config-model reads return its own intent (library/effective view) and cannot show you state Central does
 not know about, which is what a push failure usually is. Before changing anything in Central again:
