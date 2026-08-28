@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0
+- **eo-guardrails: four new always-on reflexes and three change gates**, distilled from a long live engagement where each one was paid for in lost hours. These are behavioural, so they ship in the always-on grounding skill rather than a task-triggered skill - a rule that only loads when a task matches will not fire at the moment you need it.
+  - *Diagnose by READING, not by changing* - the error names an object on the device; cloud/controller reads return that system's intent and cannot show state it does not know about. Countable test: changed the management system twice without a fresh device reading = poking, not diagnosing.
+  - *Suspect your instrument before the world* - a uniformly negative OR uniformly positive result is a claim about your tooling first; a null/error means "wrong call", never "capability does not exist".
+  - *Validate the success criterion before you chase it.*
+  - *Inherited claims are hypotheses* - handoffs, audits, prior sessions.
+  - *An intention is not a record* - write it the same turn, read it back; a cited-but-uncommitted baseline is not a backout path.
+  - *Prove a new check FIRES before trusting its silence* - plus a control that must NOT fire.
+  - *Capability is not permission* - read the terms and robots.txt in full before ingesting anyone's content; identify honestly, and if an honest client is refused, you are refused.
+
 ## 0.13.0
 - Guardrail: **skills are a distribution channel - serialise the writes.** Spoke/engagement chats propose skill edits; the coordinator lands, versions and pushes. Prompted by two chats committing to the same SKILL.md three minutes apart. Explicitly not a quality gate on spokes: their contributions that day were sound and one corrected a coordinator error.
 - Corollary recorded: writing something into a skill does not make it operative - a skill not loaded mid-session is not consulted.

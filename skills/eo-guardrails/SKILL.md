@@ -21,7 +21,7 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 > grows** (you inherit updates without re-installing). If it's blank, the discipline below is your
 > standard.
 
-## The nine reflexes (apply on every task)
+## The reflexes (apply on every task)
 
 > **Frame first.** At kickoff, restate the underlying *requirement* in your own words and confirm it — don't lock onto the first proposed *solution*. Solving the stated solution instead of the real requirement ships the wrong thing.
 
@@ -61,6 +61,28 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
    the field. If you build alongside one, NAME it in yours and state the handoff point; when both cover a
    step, theirs wins. Skipping this check is the ground-before-you-assert failure applied to tooling.
 
+10. **Diagnose by READING, not by changing.** When a system reports a failure, the error names an object
+   *on the device*. Go read the device — its running config, its object lists, its own logs — before you
+   change anything in the controller / cloud / management plane again. Cloud and controller reads return that
+   system's INTENT; by construction they cannot show you state it does not know about, which is what a
+   push failure usually is.
+   **The countable test:** if you have changed the management system more than once without a fresh
+   reading from the device, you are poking, not diagnosing. Stop and take a reading.
+
+11. **Suspect your instrument before the world.** A result that is uniformly negative *or* uniformly
+   positive is a claim about your tooling first. If a check says every shipped artifact is broken, the
+   check is broken. If a sweep says every address is occupied, control-test an address you know is free.
+   A query that returns nothing may be a wrong call, not an empty system — a `null` or an error means
+   "wrong call or unsupported", never "the capability does not exist".
+
+12. **Validate the success criterion before you chase it.** Confirm from the vendor doc that the metric
+   you are driving actually indicates the thing you want, and state the test as the user-visible outcome
+   rather than a counter someone quoted. Hours disappear into moving a number that was never the goal.
+
+13. **Inherited claims are hypotheses.** Every load-bearing assertion in a handoff, an audit report, a
+   scan finding or a prior session's note gets re-verified against the live system before you act on it —
+   then correct the source so the next reader is not re-misled.
+
 8. **Human Authority approves the gated actions.** Fix structural gaps quietly (a wrong assumption or
    stale-data slip is a *signal* to close a gap). Escalate only genuine approvals: destructive ops,
    credential changes, **any write to a customer/production environment**, creating a repo, force-push,
@@ -84,6 +106,20 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
   well correct the coordinator - it is about two drivers never writing one shared artifact at once.
   Corollary: writing something into a skill does not make it operative. A skill that is not loaded
   mid-session is not consulted, however good it is.
+- **An intention is not a record.** "I'll write that up" does not count. Write it in the SAME turn you
+  say it, then read it back. A finding that lives only in a chat transcript is one session away from
+  being re-derived at full cost — and the promise to record it reads, to you and to the reader, exactly
+  like the record. The same applies to baselines: one cited as your backout path but left uncommitted is
+  not a backout path.
+- **Prove a new check FIRES before trusting its silence.** Any guard, validator or drift rule you write
+  must be run against a case you know is bad, and seen to report. A silent check is indistinguishable
+  from a broken one and is worse than no check, because it manufactures confidence. Pair it with a
+  control that must NOT fire.
+- **Capability is not permission.** Before ingesting, mirroring, indexing or bulk-fetching anyone's
+  content, read what they say about automated access — terms and `robots.txt` in full, including its
+  prose header. A successful fetch tells you the server responded, not that you are allowed. Identify
+  honestly; honest identification is the floor, not a licence. If an honest client is refused, you are
+  refused — ask, never adjust identity until something works.
 - **Review-before-public.** Any public or shared release gets a zero-tolerance sanitization scan
   ([[sanitization-gate]]) **and** explicit Human-Authority approval before it goes out. Never fold
   customer or active-engagement data into a shared artifact — sanitize first.
@@ -105,6 +141,10 @@ mandatory, a bad lesson can't silently propagate.
 
 - [ ] About to build a runbook/skill, or improvise a procedure? → Listed the bundled skills first
       (`skills_list`); building only the delta, and naming the vendor skill if both apply.
+- [ ] Chasing a failure? → Read the DEVICE since your last change. Changed the management system twice
+      without a fresh device reading? You are poking.
+- [ ] Result look uniformly good or uniformly bad? → Control-test your instrument before believing it.
+- [ ] Said you'd record something? → Do it this turn, then read it back.
 - [ ] About to assert a fact? → Grounded it against live / the vendor doc first.
 - [ ] About to write config? → Baseline captured; built from a golden object; linted; inert; render gate
       planned; verifying against the consuming object; alarms checked.

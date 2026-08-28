@@ -37,7 +37,7 @@ set.
 
 | Skill | What it does | Risk |
 |---|---|---|
-| **eo-guardrails** | The nine always-on reflexes + change/validation gates. | grounding |
+| **eo-guardrails** | The always-on engineering reflexes + change/validation gates. Includes diagnose-by-reading, instrument-suspicion, prove-the-check-fires, and capability-is-not-permission. | grounding |
 | **connector-setup** | Stand up your OWN hpe-networking MCP connector (Docker, HTTP, your creds) — checked one-command setup. | setup |
 | **onboarding-shakedown** | Guided READ-ONLY first run to prove a new setup works end to end. | read-only, setup |
 | **inventory-reconcile** | Regenerate inventory from live (your connectors) and flag drift. | read-only |
