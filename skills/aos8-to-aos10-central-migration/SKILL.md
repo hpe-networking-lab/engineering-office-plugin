@@ -41,6 +41,19 @@ maintained by the connector authors and improves without us.
 
 ## 0. Two rules that prevent most of the pain
 
+> **Use the connector's bundled `aos-migration` runbook as the primary instrument** (`skills_list` →
+> `skills_load`). It is VSG-anchored and produces the per-object disposition matrix and Central API call
+> sequence you would otherwise assemble by hand. Two verified caveats as of 2026-08-28:
+> - Its **upload branch (`file_manager`) is not reachable in the connector's code mode** — use the paste
+>   branch, and restrict the paste to the modelled classes (`user-role`, `ip access-list session`,
+>   `netdestination`) so PSKs and RADIUS secrets never enter context.
+> - `aos8_parse_config` **silently truncates quoted object names containing spaces**
+>   (`"btlib block"` → `"btlib`), in both definitions and references, with **no warning**. Diff its output
+>   against the raw stanzas for any such object.
+> - It does **not** model `bw-contract`; it emits a `_warnings` entry. Carry bandwidth contracts across
+>   by hand.
+
+
 1. **Read the vendor procedure first, then confirm it in the lab.** The lab confirms the doc; it does not
    invent a procedure. Reverse-engineering the Central API by trial and error is how this migration went
    wrong repeatedly.
