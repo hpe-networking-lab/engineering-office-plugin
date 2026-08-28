@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.2
+- **CORRECTION.** The 0.17.x claim that `central_get_*` cannot return an object at any scope was too broad: querying **by name** (`name=`, `view_type='LIBRARY'`) returns it; only the unfiltered list omits it.
+- **New gotcha:** a `LOCAL` role create (with scope_id + device_function) can return `SUCC_001` and produce a **Library-only** object assigned to no scope. Observed consequence: the gateway lacked the role, the client fell through to the 802.1X default role and landed on `authorization.default-vlan-id`. Verify a role is ASSIGNED at the serving scope, not merely that it exists.
+
 ## 0.17.1
 - **CORRECTION to 0.17.0.** The claim "a tunnel-mode SSID cannot use the AP's underlay VLAN" was overgeneralised from one SSID and is withdrawn. An 802.1X SSID with a role/RADIUS-assigned VLAN works on the underlay VLAN (`dtunnel` confirmed); the failure is specific to the VAP-derived-VLAN path on an Open/cloud-NAC SSID. The reason string `derive_vlan_from_vp` suggests the two assignment paths validate differently - recorded as a hypothesis, not a finding.
 

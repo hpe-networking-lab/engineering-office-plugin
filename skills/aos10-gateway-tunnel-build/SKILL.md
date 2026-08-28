@@ -338,17 +338,24 @@ does **not** mean the device rendered it.
 - Use **CLI Viewer > Candidate Config** at device scope to see the exact CLI Central intends to push, and
   diff it against the device's running config.
 
-**`central_get_*` can fail to return an object that EXISTS.** Verified 2026-08-28: a role created via
-`central_manage_roles` (HTTP 200, `SUCC_001`) was absent from `central_get_roles` at site, collection,
-global AND library scope — yet re-creating it returned
-`Cannot create duplicate config, Module = Role where name='X' already exists in Library`. The write had
-worked; the read was lying.
+**`central_get_*` UNFILTERED lists omit objects that exist — query by name.** Corrected 2026-08-28
+(an earlier revision of this skill wrongly said the object was unreadable at every scope):
+```
+central_get_roles()                                    -> object ABSENT from the list
+central_get_roles(name='X', view_type='LIBRARY')        -> returns it in full
+```
+The list view is the unreliable one. Two separate causes conspire: default page size (a 25-item page
+against 59 objects looks exactly like a missing object), and library objects not appearing in scoped
+list reads. **Query by name before concluding anything is missing**, and if you still doubt it, attempt
+to CREATE it again — `Cannot create duplicate config … already exists in Library` is proof of existence.
 
-> **Existence probe that actually works: try to CREATE it again.** A duplicate-name error is proof the
-> object exists. A clean create means it did not. This is an executable check — prefer it to a read-back
-> whenever a config-model write "seems" to have vanished, and never conclude "the write silently failed"
-> from a `get` alone. (Corollary: also check page size — a default 25-item page against 59 objects looks
-> exactly like a missing object.)
+**A `LOCAL` create can silently become a LIBRARY object.** `central_manage_roles` with
+`object_type='LOCAL'` + `scope_id` + `device_function` returned `SUCC_001` twice and produced a role that
+existed **only in the Library, assigned to no scope**. Consequence, observed end to end: the gateway had
+no such role, so an authenticated client fell through to the 802.1X default role and landed on
+`authorization.default-vlan-id` instead of the role's VLAN — a silent, entirely plausible-looking wrong
+answer. **After creating a role, verify it is ASSIGNED at the scope that serves the device**, not merely
+that it exists. For tunnel-mode SSIDs that scope is the GATEWAY configuration group (see §5d/§7).
 
 **Write to the scope where the object is actually assigned.** Updating the *library* copy of a WLAN does
 nothing to the device. Find the real assignment in the profile list's **"Assigned Device Scope"** column
