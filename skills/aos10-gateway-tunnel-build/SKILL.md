@@ -169,6 +169,30 @@ Do NOT author configuration in Classic. Classic is used only for this removal ac
 
 ## 5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
 
+**And when a push FAILS, the error names a device object — go read the device first.** Central's
+config-model reads return its own intent (library/effective view) and cannot show you state Central does
+not know about, which is what a push failure usually is. Before changing anything in Central again:
+
+```
+show switches                                  # Config ID advancing? CONFIG FAILURE(n)?
+show configuration failure                     # Total Failures 0 => commit-confirm timeout, not bad config
+show running-config | include <object-in-the-error>
+show aaa rfc-3576-server | show aaa server-group | show rights   # object lists
+show aaa profile <name>                        # the profile that holds the reference
+```
+
+Worked example: `RFC 3576 Server "<ip>" is in use` on every push touching one WLAN, while Central showed
+that server as `AUTH_ONLY` at every scope. Four read-only commands found the real cause — a DIFFERENT
+SSID's AAA profile still carried the RFC-3576 reference, because its `primary-auth-server` drives
+`rfc3576-server-list` while the other SSID used an `auth-server-group`. Every action taken against the
+failing SSID was against the wrong object. **If you have changed Central more than once without a fresh
+device reading, you are poking, not diagnosing.**
+
+Note the AAA profile is `system created and non editable` — it is generated from the WLAN, and the
+binding is STORED, not recomputed: forcing regeneration does not clear a stale entry. Repoint the source
+field on the WLAN.
+
+
 This is the single most repeated mistake. `SUCC_001` / HTTP 200 means Central accepted the object. It
 does **not** mean the device rendered it.
 
