@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0
+- Guardrail: **skills are a distribution channel - serialise the writes.** Spoke/engagement chats propose skill edits; the coordinator lands, versions and pushes. Prompted by two chats committing to the same SKILL.md three minutes apart. Explicitly not a quality gate on spokes: their contributions that day were sound and one corrected a coordinator error.
+- Corollary recorded: writing something into a skill does not make it operative - a skill not loaded mid-session is not consulted.
+
 ## 0.12.0
 - **New guardrail reflex — "check the shelf before you build or improvise."** Before writing a runbook, procedure, or skill for a vendor platform, list what the connectors already ship (`skills_list` → `skills_load`) and read it. Build only for the DELTA; name the vendor skill in yours and state the handoff; when both cover a step, theirs wins. Added as reflex 9 in `eo-guardrails`, reflex 10 in the portable grounding, and folded into the toolset-awareness section and the pre-flight self-check.
 - Origin: an AOS 8 → AOS 10 migration skill was built here without first checking that the connector already bundles a 192KB `aos-migration` skill. They turned out to be complements (assessment+planning vs execution+triage) — but that was luck, not method.

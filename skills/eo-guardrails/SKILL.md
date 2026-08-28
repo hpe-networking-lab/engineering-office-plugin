@@ -77,6 +77,13 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 - **Source-control flow.** In **remote** mode: no direct commits to the default branch — `feature/<name>`
   → push → PR → review → merge (Human Authority holds the merge). In **local** mode: a local repo for
   history + the review habit is recommended; no remote required.
+- **Skills are a distribution channel - serialise the writes.** A skill edit reaches every chat and every
+  machine, so treat the skills repo like a device under the one-driver rule. Engagement/spoke chats
+  PROPOSE (stage the change where your practice collects them); the coordinator LANDS, versions and
+  pushes. This is not a quality gate on spokes - their field findings are often the best content, and may
+  well correct the coordinator - it is about two drivers never writing one shared artifact at once.
+  Corollary: writing something into a skill does not make it operative. A skill that is not loaded
+  mid-session is not consulted, however good it is.
 - **Review-before-public.** Any public or shared release gets a zero-tolerance sanitization scan
   ([[sanitization-gate]]) **and** explicit Human-Authority approval before it goes out. Never fold
   customer or active-engagement data into a shared artifact — sanitize first.
