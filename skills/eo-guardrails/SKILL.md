@@ -106,6 +106,10 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
   well correct the coordinator - it is about two drivers never writing one shared artifact at once.
   Corollary: writing something into a skill does not make it operative. A skill that is not loaded
   mid-session is not consulted, however good it is.
+- **Put the condition IN the artifact that travels.** When you hand someone something to forward — a
+  paste block, a kickoff, a brief — every prerequisite and constraint must be inside it. Anything said
+  only in the surrounding conversation is lost the moment it is pasted. Re-read the block alone and ask:
+  if this were all the recipient saw, would they do the right thing?
 - **Name the ACTOR for every proposed action.** Say who performs it — you, the Human, or another
   session — and if it needs the Human, exactly what they must physically do. A paste-ready block handed
   over without an owner silently becomes the Human's job. Before proposing a test, check the recipient

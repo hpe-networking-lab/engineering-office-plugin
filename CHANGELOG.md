@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.16.0
+- Guardrail: **put the condition IN the artifact that travels.** Prerequisites stated only in the surrounding conversation are lost the moment a block is pasted onward. Re-read the artifact alone before handing it over.
+
 ## 0.15.0
 - Guardrail: **name the ACTOR for every proposed action.** Handing over a paste-ready block without saying who runs it silently makes it the Human's job. Check the recipient can actually execute it first - a test needing a physical client, a Human-only credential, or a write on a system another session drives cannot be run by them, and saying so is part of the proposal.
 
