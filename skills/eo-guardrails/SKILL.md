@@ -106,6 +106,13 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
   well correct the coordinator - it is about two drivers never writing one shared artifact at once.
   Corollary: writing something into a skill does not make it operative. A skill that is not loaded
   mid-session is not consulted, however good it is.
+- **Name the ACTOR for every proposed action.** Say who performs it — you, the Human, or another
+  session — and if it needs the Human, exactly what they must physically do. A paste-ready block handed
+  over without an owner silently becomes the Human's job. Before proposing a test, check the recipient
+  can actually run it: one needing a physical client, a credential only the Human holds, or a write on a
+  system another session is driving cannot be executed by them, and saying so is part of the proposal.
+  If the missing piece is something already being built, say "wait for it" rather than asking the Human
+  to stand in for it once.
 - **An intention is not a record.** "I'll write that up" does not count. Write it in the SAME turn you
   say it, then read it back. A finding that lives only in a chat transcript is one session away from
   being re-derived at full cost — and the promise to record it reads, to you and to the reader, exactly

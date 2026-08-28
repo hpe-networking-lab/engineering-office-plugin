@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.15.0
+- Guardrail: **name the ACTOR for every proposed action.** Handing over a paste-ready block without saying who runs it silently makes it the Human's job. Check the recipient can actually execute it first - a test needing a physical client, a Human-only credential, or a write on a system another session drives cannot be run by them, and saying so is part of the proposal.
+
 ## 0.14.0
 - **eo-guardrails: four new always-on reflexes and three change gates**, distilled from a long live engagement where each one was paid for in lost hours. These are behavioural, so they ship in the always-on grounding skill rather than a task-triggered skill - a rule that only loads when a task matches will not fire at the moment you need it.
   - *Diagnose by READING, not by changing* - the error names an object on the device; cloud/controller reads return that system's intent and cannot show state it does not know about. Countable test: changed the management system twice without a fresh device reading = poking, not diagnosing.
