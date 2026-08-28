@@ -177,9 +177,17 @@ Monitoring reporting `portType: Access, vlan: 1` means the port **untags everyth
 > transmitted and received traffic on the port is untagged."
 > Trunk — "allow the LAN port to carry traffic for multiple VLANs... Native VLAN... Allowed VLAN"
 
-An access-mode uplink is physically incapable of emitting a tagged client VLAN. Confirm at the switch:
-`show mac-address-table vlan <id>` on the upstream switch returning **"No MAC entries found"** while
-clients are associating is proof the gateway never sent a tagged frame.
+An access-mode uplink is physically incapable of emitting a tagged client VLAN.
+
+**Do NOT try to confirm this with the upstream switch MAC table in TUNNEL mode.** In tunnel mode client
+traffic rides the GRE tunnel from the AP to the gateway, so the access switch never learns client MACs on
+that VLAN from the AP port. `show mac-address-table vlan <id>` returning **"No MAC entries found"** is the
+EXPECTED result and proves nothing — and with no client associated there is no frame in the network at
+all. Treating that silence as a fault means debugging an empty network.
+
+- **Bridge mode**: the switch MAC table IS a valid check — the AP tags client frames onto the wire itself.
+- **Tunnel mode**: check the GATEWAY instead — `show datapath tunnel` (AP GRE entry count),
+  `show user-table` (client entries), `show datapath vlan` (is the VLAN on the tunnel ports 2/0/x).
 
 ### The object and the field name
 
@@ -307,12 +315,28 @@ sshpass -p "$PW" ssh -tt \
 An ACP-locked gateway refuses `configure terminal` and `write memory` — but **every `show` command
 works.** Read-only is exactly what diagnosis needs. "ACP-locked" is not "unreadable".
 
-### central_show_commands returns null for gateways
+### central_show_commands WORKS — but its device_type enum differs from every other tool
 
-Its parameters are `serial_number`, `device_type`, `commands` — *not* `serial`. Passing the wrong name
-returns `null` rather than an error. Even with correct parameters it returned `null` for every
-device_type tried against a 9004. **A `null` from a tool means "wrong call or unsupported", never "the
-capability does not exist" — check the schema before concluding you have no instrument.**
+This is the single highest-value line in this section. `central_show_commands` returns `null` — not an
+error — for every wrong argument, so a wrong enum value looks exactly like "unsupported device".
+
+**The enums are NOT the same between tools:**
+
+| Tool | `device_type` values |
+|---|---|
+| `central_get_devices` | `ACCESS_POINT` / `SWITCH` / `GATEWAY`  (UPPER, singular) |
+| `central_show_commands` | `aps` / `cx` / `aos-s` / `gateways`  (lower, PLURAL) |
+
+Also: the parameter is `serial_number` (not `serial`), and `commands` takes a **string**, not a list.
+
+```python
+central_show_commands(serial_number="<serial>", device_type="aps", commands="show ap bss-table")
+```
+
+Trying `ACCESS_POINT`, `AP`, `GATEWAY`, `MOBILITY_GW` all return `null` and lead to the false conclusion
+that no device-read instrument exists — which then sends you back to Central reads, which is the exact
+failure this whole section is written to prevent. **A `null` means "wrong call", never "no such
+capability". Check the enum before concluding you are blind.**
 
 ### show configuration failure is a HISTORY, newest first
 
@@ -363,6 +387,27 @@ Never delete a policy a role references — the role keeps a dangling reference 
 clear, and **every subsequent push to that device fails**. To make a policy harmless in place, repoint
 its deny destinations at RFC 5737 documentation prefixes (`192.0.2.0/24`, `198.51.100.0/24`,
 `203.0.113.0/24`). The ACL stays non-empty and renders; it blocks nothing.
+
+---
+
+## 5c. Before diagnosing a tunnel WLAN, confirm a client is actually associated
+
+Every tunnel-mode datapath counter reads "empty" when nothing is associated, and empty looks identical to
+broken. Establish there is a client BEFORE interpreting any of it:
+
+```
+show ap bss-table          (on the AP)   # is the ESSID being broadcast, on which radios
+show ap association        (on the AP)   # cur-cl / client rows -- zero means an empty network
+show user-table            (on the GW)   # "User Entries: 0/0" == nothing to debug
+show datapath tunnel       (on the GW)   # AP GRE entry count -- tunnel health, independent of clients
+```
+
+If `show ap association` is empty on **every** SSID, the network is idle, not faulty. An SSID that is
+broadcasting on both radios with zero associations and a healthy GRE tunnel is a network waiting for a
+client — no amount of further reading will produce a fault, because there is not yet any traffic to fail.
+
+**Only a real client association proves a tunnel-mode WLAN works.** Config being correct at every layer
+proves only that it should.
 
 ---
 
