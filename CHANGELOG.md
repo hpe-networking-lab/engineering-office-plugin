@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.17.1
+- **CORRECTION to 0.17.0.** The claim "a tunnel-mode SSID cannot use the AP's underlay VLAN" was overgeneralised from one SSID and is withdrawn. An 802.1X SSID with a role/RADIUS-assigned VLAN works on the underlay VLAN (`dtunnel` confirmed); the failure is specific to the VAP-derived-VLAN path on an Open/cloud-NAC SSID. The reason string `derive_vlan_from_vp` suggests the two assignment paths validate differently - recorded as a hypothesis, not a finding.
+
 ## 0.17.0
 - **aos10-gateway-tunnel-build §5d: root cause established.** A tunnel-mode (overlay) SSID cannot use the AP's UNDERLAY VLAN - it is rejected at the AP (`a2g-sta-up` -> ~100ms -> `a2g-sta-down`, `TUNNEL_DOWN`, ~1 Hz SSID flap). `show ap debug vlan` (VLAN Assignment Failure Table) names the reason in one line: 17 failures on the underlay VLAN, zero after moving to a dedicated client VLAN. Also records what was NOT the fix, and flags an unexplained difference in 802.1X behaviour on the underlay VLAN.
 
