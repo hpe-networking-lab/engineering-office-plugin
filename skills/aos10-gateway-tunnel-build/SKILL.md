@@ -1105,6 +1105,18 @@ every scope.
 > the API path works, that cost estimate was too high. The advice not to rebuild was still correct — the
 > hypothesis behind it was independently falsified — but the reasoning leaned on an unverified claim.
 >
+> **Vendor-doc check (2026-08-29) — INCONCLUSIVE, recorded as such.** The vendor workflow
+> *Configure Tunneled SSID* (developer.arubanetworks.com/new-central/docs/configure-tunneled-ssid-workflow)
+> only ever **creates** — "Creates SSID profiles with associated roles… creates overlay WLAN profiles".
+> It never describes converting an existing bridge SSID to tunnel. That is consistent with the claim and
+> is **not** proof of it: a workflow that only creates does not establish that update is forbidden. The
+> claim stays `[observed-once]`.
+>
+> Useful side-finding from the same doc, and it CORROBORATES §1b: its stated prerequisite is
+> *"Underlay is configured with Gateways in established cluster and any VLANs configured & assigned to
+> the appropriate scopes"* — the cluster must exist and be established BEFORE the overlay WLAN. That is
+> the vendor stating §1b's ordering as a precondition.
+>
 > **RETRACTED settle path (2026-08-29, same day it was written).** I proposed settling this with a
 > scratch WLAN — create, PATCH `forward-mode`, read back, delete — described as "lab only". **There is
 > no lab Central tenant.** `inventory/lab-writable-allowlist.yml` lists `lab_writable` as EMPTY, records
