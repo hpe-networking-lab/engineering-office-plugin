@@ -1204,3 +1204,69 @@ the reason (§5h). It told the truth immediately in this case, on the first read
 - At a customer site, first. Do it in a lab, on a device you have rebuilt before.
 - Without console or physical access available, unless you have confirmed the DHCP recovery path.
 - While APs are anchored, unless the outage is planned — every tunnel drops and re-anchors.
+
+---
+
+## 13. The reachability set for an AOS 10 gateway
+
+This section instantiates the standing rule **REACHABILITY IS CONFIGURED FIRST AND TORN DOWN LAST**
+(PROJECT-INSTRUCTIONS). The rule is platform-independent; what follows is the AOS 10 Central
+membership of it. **Read the rule first — it applies even where this skill does not.**
+
+### The set — every item a Central-managed gateway needs to stay reachable
+
+| # | Element | Where it lives | Wiped by Reset Config / factory? |
+|---|---|---|---|
+| 1 | Uplink port VLAN membership (trunk, native VLAN) | GW Interface Configuration, device scope | **YES** |
+| 2 | VLAN L3 static address | VLAN profile, device scope | **YES** |
+| 3 | Default gateway | Static Routing > Device-Specific Parameters > Gateway/AOS-S Parameters > Default Gateways | **YES** |
+| 4 | **DNS Server profile** | System > DNS, needs assigning at site or device scope | **YES** |
+| 5 | System IP VLAN | Gateway System profile, device scope | **YES** |
+| 6 | Management pointer (`mgmt-server ... default-acp`) | auto-import / local override | regenerates |
+
+**Every one of items 1-5 is device-scope and dies with the device config.** None of them is a
+prerequisite you can "check and proceed" past — they are all rebuild work. Item 4 is the one most
+often forgotten because on a healthy gateway DNS often arrives from DHCP on the auto-import VLAN
+4094, so it is invisible until the uplink becomes a static trunk and the resolver silently vanishes.
+
+### Build order (dependencies are real, not stylistic)
+
+    1. uplink port trunk + native VLAN      <- until this, the VLAN owns no port and stays DOWN
+    2. VLAN L3 static address               <- fails with "IP address conflicts with another
+                                               interface" if VLAN 4094 still holds the DHCP lease
+    3. default gateway
+    4. DNS
+    5. System IP VLAN                       <- the VLAN only appears in the drop-down after step 2
+    6. cluster re-forms on its own
+
+### Verify the management path BEFORE any feature check
+
+    show ip route      -> S* 0.0.0.0/0 present
+    show ip domain-name-> at least one name server listed
+    show switches      -> UPDATE SUCCESSFUL, and NOT "(Conductor Unreachable)"
+
+`(Conductor Unreachable)` is an emergency, not a footnote. A gateway can show a correct system IP,
+a correct trunk, an up VLAN and a healthy cluster while it is losing its control plane — all four
+were green on 2026-08-29 while the box was dying twice.
+
+Diagnostic split when the manager is unreachable:
+
+    ping <default gw>  ok + ping 8.8.8.8 ok + manager unreachable   -> DNS (item 4)
+    ping 8.8.8.8 fails                                              -> default route (item 3)
+    VLAN protocol DOWN                                              -> uplink port (item 1)
+
+### Central has NO auto-revert
+
+There is no `commit confirmed` equivalent. A bad push is not backed out; the device simply leaves.
+That makes Central **more** dangerous than a Junos box, not less. Confirm console or physical
+access is available before any change to items 1-5.
+
+### If it is already cut off, fix the manager, not the device
+
+`configure terminal` is refused on an ACP-managed gateway, so nothing can be repaired locally.
+Complete the Central-side config **while the device is offline**, then recover it — so the config
+it pulls is self-sufficient. Two recoveries looped on 2026-08-29 precisely because the device kept
+pulling a config that re-stranded it. Note also that a plain `reload` does NOT return an ACP
+gateway to the factory DHCP posture — it retains the static config and stays stranded. Only
+`write erase all` produces a genuinely unprovisioned boot, and it IS accepted (unlike
+`configure terminal`).
