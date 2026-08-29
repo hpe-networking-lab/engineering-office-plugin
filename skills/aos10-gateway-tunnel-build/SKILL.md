@@ -1045,9 +1045,20 @@ every scope.
 > the API path works, that cost estimate was too high. The advice not to rebuild was still correct — the
 > hypothesis behind it was independently falsified — but the reasoning leaned on an unverified claim.
 >
-> **Non-destructive way to settle it, in the LAB only:** create a scratch WLAN, PATCH its `forward-mode`,
-> read back the stored profile, then delete the scratch object. No customer tenant, no production SSID,
-> full revert. Until someone does that, treat this section as a UI observation and nothing more.
+> **RETRACTED settle path (2026-08-29, same day it was written).** I proposed settling this with a
+> scratch WLAN — create, PATCH `forward-mode`, read back, delete — described as "lab only". **There is
+> no lab Central tenant.** `inventory/lab-writable-allowlist.yml` lists `lab_writable` as EMPTY, records
+> `Smitty-Lab-Trial` under `confirmed_customer` (David's confirmation, 2026-08-05, correcting an earlier
+> misclassification in exactly this direction), and the CoA engagement grounding carries an explicit
+> hard stop: *"no experimentation on the tenant. Do NOT create throwaway test objects."*
+>
+> I proposed a customer-tenant write and called it non-destructive. It would have been caught by the
+> write-approval gate, but it should not have been written down as a recommendation — a skill ships to
+> every chat and every machine, so a bad settle path is worse than an unvalidated claim.
+>
+> **This claim therefore cannot be settled by test today.** It can only be settled by vendor
+> documentation, or on a Central tenant explicitly confirmed lab-writable. Until then it is
+> `[observed-once]`, UI-scoped, and must not be used as a cost estimate for a rebuild decision.
 
 ## 9. Working with an inherited handoff
 
