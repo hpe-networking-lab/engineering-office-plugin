@@ -40,6 +40,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
@@ -51,7 +52,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §2. Build order (New Central) — prerequisites BEFORE anything destructive
 - §3. When Central "cannot" change the gateway's uplink or system IP
 - §3b. Carrying a tagged client VLAN out of the gateway uplink
-- §4. What is device-owned vs Central-managed
+- §4. What is device-owned vs Central-managed   `[proven]` — validated live 2026-08-29
 - §5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
 - §5b. HOW to actually read an ACP-locked gateway — the mechanics S5 assumes
 - §5c. Before diagnosing a tunnel WLAN, confirm a client is actually associated
@@ -360,31 +361,55 @@ The API validates server-side, so a wrong field name is rejected without reachin
 
 ---
 
-## 4. What is device-owned vs Central-managed
+## 4. What is device-owned vs Central-managed   `[proven]` — validated live 2026-08-29
 
-- All ZTP ports land in **VLAN 4094**; the ZTP uplink is a DHCP client there. This is normal.
-- Onboarding **auto-imports** the device's connectivity config into **device-scope profiles**
-  (VLAN, L3 VLAN, Static Routing, GW Interface Configuration, User Administration, DNS, System Info).
-  If those objects are missing from Central but present on the device, the auto-import did not complete —
-  that is the anomaly to chase, not "Central can't model it".
+**Validated against a live 9004 (CNHVKLB014) via `central_get_scope_tree`.** The device scope holds
+exactly these 9 resources:
+
+    layer2-vlan/1                          vlan-interfaces/1
+    layer2-vlan/4094                       vlan-interfaces/4094
+    static-route/CoA-GW-DefaultRoute-dev   ethernet-interfaces/0%2F0%2F0
+    aliases/sys_vlan_ipv4_4094             system-info/sys-system-info-profile
+    gw-system/CoA-GW-SystemIP-VLAN1-dev
+
+**CONFIRMED device-scope:** VLAN (layer2-vlan), L3 VLAN (vlan-interfaces), Static Routing,
+GW Interface Configuration (ethernet-interfaces), System Info, gw-system.
+
+**FALSIFIED — these are NOT device-scope, despite earlier versions of this section listing them:**
+
+| Claimed | Actually lives at |
+|---|---|
+| **DNS** | **SITE** — `dns/CoA-DNS` at scope CoA-POC |
+| **User Administration** | **GLOBAL** — `management-users/Gateway-Admin` under the MOBILITY_GW persona |
+
+That distinction is load-bearing: a device Reset Config wipes device scope, so **DNS and the
+management user SURVIVE it** — they are re-pushed from site/global, not rebuilt by you. Treating them
+as device-scope rebuild work wastes effort and, worse, invites you to "restore" objects that were
+never lost.
+
+Other confirmed facts:
+- All ZTP ports land in **VLAN 4094**; the ZTP uplink is a DHCP client there. Normal.
 - An **ACP-managed gateway refuses BOTH `configure terminal` AND exec `write`**
-  ("This controller is managed by an ACP"). Budget for *no CLI at all* before planning any device-level fix.
-- SSH is still useful for `show` commands. But **`show running-config` over plain ssh returns EMPTY**
-  (it needs a pty) — use the Central show-command API. Never conclude a config line is absent from an
-  empty ssh result.
+  ("This controller is managed by an ACP"). Budget for no CLI before planning a device-level fix.
+- SSH still serves `show`. **`show running-config` over plain ssh returns EMPTY** (needs a pty) —
+  never conclude a line is absent from an empty ssh result. See §5b.
 
+### 4a. INSTRUMENT WARNING — how to enumerate device scope, and how NOT to
 
-### 4b. Around any REGENERATING action -> go to §12
+**Use `central_get_scope_tree`.** Walk to the DEVICE node and read its `resources` list.
 
-Reset config / site move / reload / a Central device-scope re-push are the SAME event: flash is
-factory-default, so each wipes the whole device-scope layer at once.
+**Do NOT use these to decide what exists at a scope — both returned empty on a scope that demonstrably
+holds 9 objects (measured 2026-08-29):**
 
-**The capture list, the scope-aware prerequisite trap, the measured post-reset state and the
-load-bearing rebuild order are all in §12.** Do not re-derive them here.
-Reachability set: §13. Engagement-specific values (addresses, ports, cluster names) belong in a
-device-scope manifest in the ENGAGEMENT record, never in this skill.
+    central_get_config_assignments(scope_id=<device>)              -> {"config-assignment": []}
+    central_get_config_assignments(scope_id=<device>,
+                                   device_function="MOBILITY_GW")  -> {"config-assignment": []}
+    central_get_system_info(scope_id=<device>,
+                            device_function="MOBILITY_GW")         -> {}      <- object EXISTS
 
----
+The site scopes returned 16 and 30 assignments from the same tool with the same shape of call, so the
+tool works — it just does not enumerate DEVICE scope. **An empty result here is a claim about the
+instrument, not about the device.** Corroborate from the scope tree before concluding absence.
 
 ## 5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
 
