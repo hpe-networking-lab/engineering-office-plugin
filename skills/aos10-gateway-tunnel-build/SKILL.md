@@ -14,6 +14,30 @@ description: Build, change, or troubleshoot an HPE Aruba AOS 10 Mobility Gateway
 
 
 
+## CLAIM CONFIDENCE — read this before relying on any section
+
+Every technical claim in this file carries one of these. **An untagged claim is unvalidated**, not
+merely undocumented:
+
+| Tag | Means | You may |
+|---|---|---|
+| `[doc-grounded]` | vendor documentation states it; the URL is in the section | rely on it |
+| `[proven]` | observed on a device, repeatedly or with captured output in the section | rely on it |
+| `[observed-once]` | ONE observation, ONE tenant, one firmware. May not generalise. | use as a hypothesis, verify before acting on it |
+
+**Why this exists.** This skill was built in three days during the CoA POC and **five of its claims were
+wrong or overstated and had to be corrected or withdrawn** — the cert→RADSec-reject chain, "Reset Config
+is not the fix", the overgeneralised underlay-VLAN claim, the empty Vlan-Mapping-Table claim, and the
+`central_get_*` claim (by-name works; the LIST omits). Every one was the same error: **a single
+observation written as a universal fact.** Each was caught only because work continued until something
+contradicted it — which means an unvalidated claim sits here until somebody trips over it.
+
+**Priority re-verification (unbacked and load-bearing):** §8 create-only fields, §2 build order, §4
+device-owned vs Central-managed, §7 cluster facts. §8 especially — "Primary Gateway Cluster is
+create-only" was used on 2026-08-29 to advise AGAINST a cluster rebuild on the grounds that every
+tunnel-mode WLAN would have to be recreated. If that claim is wrong, the advice was wrong. It carries no
+evidence line. The lab has a 9004, Central and APs; these are re-testable non-destructively.
+
 ## CONTENTS
 
 - §0. Ground yourself in the RIGHT doc set — first, always
