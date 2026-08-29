@@ -12,6 +12,7 @@ description: Build, change, or troubleshoot an HPE Aruba AOS 10 Mobility Gateway
 # AOS 10 Mobility Gateway + tunnel-mode WLAN — build and verify
 
 
+
 ## CONTENTS
 
 - §0. Ground yourself in the RIGHT doc set — first, always
@@ -1157,37 +1158,44 @@ Read the scope column, not just the value:
 
 ### 12a-bis. THE COST NOT IN THE DIALOG — device certificates are not config
 
-**Weigh this BEFORE choosing Reset Config, because no rebuild order can undo it.**
-
-A factory erase regenerates the gateway's **field certificates**. Certificates are not config: they
-are not in your fingerprint, not in Central's model, not in any device-scope manifest, and not
-restorable by re-pushing. The capture list in §12b cannot save them.
-
-Observed downstream (9004, 2026-08-29), all from one erase:
+**Weigh this BEFORE choosing Reset Config.** A factory erase regenerates the gateway's **field
+certificates**. Certificates are not config: not in your fingerprint, not in Central's model, not in
+any device-scope manifest, and not restorable by re-pushing. The §12b capture list cannot save them.
 
     cpsec: check_local_cert -> Invalid cluster role: 1
-    cpsec: Checking local field certificates failed
-    sys_central_nac   Raw Rq 3 / Rej 3        <- Central NAC rejects the gateway's RADSec RADIUS
-    rfc-3576 packets received: 0              <- therefore no CoA is ever sent
-    captive portal -> "Login error"
+    cpsec: enable_cpsec, Checking local field certificates failed
 
-Everything else can be verified healthy at the same time — device scope matching every manifest row,
-a client anchored `Forward mode: dtunnel`, DHCP and DNS correct — and the portal still fails. The
-guest path is broken at a layer the config model does not reach.
+> **CORRECTION 2026-08-29 — do not use these log lines to diagnose a RADIUS/NAC fault.**
+> An earlier version of this section claimed that a post-erase cert regeneration caused Central NAC
+> to reject the gateway's RADSec, and cited `sys_central_nac Raw Rq 3 / Rej 3` plus
+> `rfc-3576 received: 0` plus a portal "Login error" as the evidence chain. **That chain was wrong**
+> and is deleted rather than left standing. The device certificate was valid and accepted the whole
+> time — see §5n for the read that proves it. The cost of losing cert trust is real; those counters
+> were never evidence of it.
 
-**Config-side levers, all confirmed exhausted for this fault:**
+### 5n. Reading RADIUS counters: `Rej` with `Tmout 0` PROVES the certificate was accepted
 
-| Lever | Result |
-|---|---|
-| Full config resync | no change |
-| Reload (x3) | no change |
-| Auto-cluster | API refuses; manual is the documented mode |
-| Re-provision persona / group | verified already correct |
-| Detach + re-attach the NAC binding | Central refuses the delete (see below) |
+The single most useful RADSec diagnostic, and it is free:
 
-> **Gate: if the gateway participates in Central NAC / RADSec, treat Reset Config as certificate-
-> affecting, not merely config-affecting.** Decide whether you are willing to re-establish device
-> certificate trust before you click it. If a cheaper lever exists for the original symptom, take it.
+    sys_central_nac   Raw Rq 3   Rej 3   Tmout 0   AvgRspTm 150ms   Tot Rsp 1868
+
+**`Tmout 0` plus a measured response time means the server ANSWERED.** An Access-Reject cannot arrive
+over RADSec unless the TLS session established, and TLS establishment requires the server to have
+accepted the gateway's client (device) certificate.
+
+> **Gate: a reject is a RADIUS-layer ANSWER. It proves the transport and the certificate are fine.**
+> A certificate or trust failure presents as **timeouts or a TLS error**, never as answered rejects.
+> Read `Tmout` and `AvgRspTm` before ever concluding a cert, RADSec or trust problem.
+
+**And the rejects themselves are usually DESIGNED.** Guest MAC-auth for an unregistered MAC is
+*supposed* to be rejected: NAC rejects the unknown MAC, the gateway drops the client into the
+pre-auth role, and the captive portal runs. `CoA Req 0` is equally expected until a portal login
+actually succeeds. A client sitting in `sys_cnac_<...>-guest-auth` with `dtunnel` and a portal
+presented is **healthy guest operation**, not a fault.
+
+> **Gate: before building a root cause on a counter, establish what that counter reads in the HEALTHY
+> state.** Rq/Rej/CoA counters on a guest SSID are consistent with normal operation; treating them as
+> a symptom manufactures a fault out of correct behaviour.
 
 ### 12a-ter. A Central NAC captive-portal binding cannot be detached by setting Captive Portal Type = None
 
