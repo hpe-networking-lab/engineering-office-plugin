@@ -1175,10 +1175,10 @@ same switch port** after it boots blank.
 
 Measured on a 9004 (2026-08-29), post-reset, before any rebuild:
 
-    show controller-ip        -> 192.168.86.130, configured to be LOOPBACK interface
-    show ip interface brief   -> vlan 4094  192.168.86.38  up/up     (DHCP)
+    show controller-ip        -> <loopback-ip>, configured to be LOOPBACK interface
+    show ip interface brief   -> vlan 4094  <uplink-ip>  up/up     (DHCP)
                                  vlan 1     unassigned     up/DOWN
-                                 loopback   192.168.86.130
+                                 loopback   <loopback-ip>
     show vlan                 -> 1: GE0/0/1-0/3     4094: GE0/0/0
     show switches             -> Config ID 0, UPDATE REQUIRED
     device-scope assignments  -> EMPTY
@@ -1204,8 +1204,8 @@ frequently holds the very address you are about to configure statically on VLAN 
 fails:
 
     profmgr_app_cmd_failure: App error: "Error: IP address conflicts with another interface "
-      executing "ip address 192.168.86.38 255.255.255.0 "
-    fpapps: switchVlanIpAddrCfg: ADD request failed for address 192.168.86.38 on vlan 1, error 15
+      executing "ip address <uplink-ip> 255.255.255.0 "
+    fpapps: switchVlanIpAddrCfg: ADD request failed for address <uplink-ip> on vlan 1, error 15
     cfgm: update_failed_state: State(ACP(UP):CONFIG FAILURE:CFGID-171:...)
 
 That is a real, reproducible ordering failure, not a fluke — the DHCP server hands the gateway the

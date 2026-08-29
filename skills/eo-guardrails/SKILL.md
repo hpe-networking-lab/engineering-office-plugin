@@ -11,6 +11,17 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 
 # Engineering Office Standard — Engineering Guardrails
 
+## CONTENTS
+
+- §The reflexes (apply on every task)
+- §Change & validation gates (when the task makes a change)
+- §Toolset awareness (before saying "can't" — and before building)
+- §The continuous-improvement loop (governance)
+- §Quick self-check before you act
+
+---
+
+
 > The durable reflexes that make engineering work safe to hand to a customer and repeatable next time.
 > Tools change; these don't. **Self-contained:** these reflexes stand alone and require no particular
 > server, lab, or repo. This skill is the always-on grounding for the bundle.

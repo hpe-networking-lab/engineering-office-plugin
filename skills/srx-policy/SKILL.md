@@ -72,6 +72,30 @@ metadata:
 
 # SRX Security Policy
 
+## CONTENTS
+
+- §Overview
+- §Enforced Global-Policy Output Contract
+- §Runtime intake
+- §Recommended Architecture
+- §Policy Evaluation and Rule Order
+- §Address Book Guidance
+- §Applications and Application Sets
+- §Application Firewall / AppID Pattern
+- §Web Filtering / UTM Attachment: Prefer NGWF, Treat EWF as Existing-Estate
+- §SecIntel and ATP Placement
+- §Multicast and Service Discovery (mDNS/SSDP) Across Zones
+- §Migration Workflow from Another Vendor
+- §Pre-Return Self-Check
+- §Verification Commands
+- §Troubleshooting Matrix
+- §Common Pitfalls
+- §Verification Checklist
+- §Source Notes
+
+---
+
+
 ## Overview
 
 Use this skill for Juniper SRX security policy design on Junos 23.x and newer non-Branch SRX platforms. It focuses on the policy layer that decides whether traffic is permitted, denied, logged, counted, or passed into security services such as AppID/AppFW, NextGen Web Filtering (NGWF), Enhanced Web Filtering (EWF), SecIntel, and ATP-backed protections.

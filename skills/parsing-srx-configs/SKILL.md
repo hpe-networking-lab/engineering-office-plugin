@@ -32,6 +32,24 @@ metadata:
 
 # Parsing Juniper SRX Configurations
 
+## CONTENTS
+
+- §Overview
+- §Scope and routing
+- §Runtime intake
+- §Input Format Detection
+- §Extraction Pipeline
+- §Output Format
+- §Parser Quality Gates
+- §Analysis Checks
+- §Reference Files
+- §Secret Handling
+- §Common Pitfalls
+- §Verification Checklist
+
+---
+
+
 ## Overview
 
 Use this skill to parse Juniper SRX / Junos firewall configurations into the shared vendor-neutral firewall intermediate schema. It supports both `show configuration | display set` lines and hierarchical curly-brace configuration, including zones, address books, applications, security policies, NAT, logical-systems, routing-instances, interfaces, routing protocols, VPN, chassis cluster, and system settings.

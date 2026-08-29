@@ -28,6 +28,20 @@ metadata:
 
 # SRX Chassis Cluster on Proxmox VE
 
+## CONTENTS
+
+- §Overview
+- §Runtime intake
+- §Before you start
+- §Procedure
+- §Validation
+- §Common pitfalls
+- §Reference material
+- §Source notes
+
+---
+
+
 ## Overview
 
 Chassis cluster joins two SRX nodes into one logical chassis: a shared configuration, active/backup control plane, redundancy groups that move ownership on failure, and reth interfaces carrying a virtual MAC. Juniper documents it for two physical appliances joined by real cables.

@@ -12,6 +12,26 @@ description: Migrate controller-managed ArubaOS 8 campus APs to AOS 10 under HPE
 
 # AOS 8 → AOS 10 campus AP migration (New Central)
 
+## CONTENTS
+
+- §FIRST: run the vendor's assessment skill, not this one
+- §0. Two rules that prevent most of the pain
+- §1. Establish cluster type BEFORE planning anything
+- §2. The prerequisite chain — verify each link LIVE
+- §3. Create the group the RIGHT way, or config will never deploy
+- §4. The conversion itself (controller-side)
+- §5. After conversion — the three things that leave an AP silent
+- §6. The scope model — where config actually lives
+- §7. RADIUS / 802.1X
+- §8. What the connector can and cannot do (hybrid tenant)
+- §9. Verification — the green signature
+- §10. Deployment mode: standalone vs hybrid
+- §11. Order of operations (the short version)
+- §Provenance
+
+---
+
+
 A migration runbook distilled from a full POC plus a lab dress rehearsal. Nearly every gate here was
 paid for with hours lost or a wrong answer given to a customer.
 

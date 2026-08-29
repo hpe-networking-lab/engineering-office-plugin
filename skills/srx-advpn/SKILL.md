@@ -28,6 +28,25 @@ metadata:
 
 # SRX Auto Discovery VPN (ADVPN)
 
+## CONTENTS
+
+- §Overview
+- §Runtime intake
+- §Scope and routing
+- §Roles and the Shortcut Lifecycle
+- §The Multipoint st0 Overlay
+- §Routing over the Overlay (OSPF p2mp)
+- §PKI Enrollment
+- §Config Skeleton (`set` format)
+- §Verification
+- §Troubleshooting Matrix
+- §Choose ADVPN vs AutoVPN vs Static
+- §Verification Checklist
+- §Source Notes
+
+---
+
+
 ## Overview
 
 ADVPN is hub-and-spoke IPsec that **discovers spoke-to-spoke traffic and builds
