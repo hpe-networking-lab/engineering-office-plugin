@@ -281,7 +281,7 @@ Per the onboarding doc, create these first. Skipping any of them can strand the 
 
        static-route/CoA-GW-DefaultRoute
          default-gateway: [{dg-name: "1", forwarding-type: "NEXTHOP",
-                            ipv4-address: 192.168.86.1, metric: 1}]
+                            ipv4-address: <default-gw-ip>, metric: 1}]
 4. **DNS Server profile** — mandatory. Without a resolver the gateway cannot resolve the conductor FQDN.
 5. **User Administration profile** — carries `mgmt-user admin`.
    > **CORRECTED 2026-08-29 `[proven]`.** This previously read "it lives in the auto-imported config and
