@@ -13,6 +13,7 @@ description: Build, change, or troubleshoot an HPE Aruba AOS 10 Mobility Gateway
 
 
 
+
 ## CONTENTS
 
 - §0. Ground yourself in the RIGHT doc set — first, always
@@ -1172,6 +1173,49 @@ any device-scope manifest, and not restorable by re-pushing. The §12b capture l
 > and is deleted rather than left standing. The device certificate was valid and accepted the whole
 > time — see §5n for the read that proves it. The cost of losing cert trust is real; those counters
 > were never evidence of it.
+
+### 5o. Portal "Login error": prove the CLIENT can reach the portal service FIRST
+
+**Before reading a single NAC counter, from the ASSOCIATED client:**
+
+    curl -s -o /dev/null -w '%{http_code}\n' https://<portal-fqdn>      # 000 = you are done, this is the fault
+    curl -i http://<any-off-net-ip>/                                    # the gateway's live 302 = the REAL capture URL
+    ip neigh <client-gateway>                                           # L2 sanity
+
+`000` means the client never reached the portal, so a login was never possible and every server-side
+counter is meaningless. A gateway can be fully managed, correctly configured, anchoring `dtunnel`,
+with a clean NAC config, while the client cannot reach the service being tested.
+
+**Two traps that produce a perfect-looking "server fault":**
+
+1. **A POC subnet changed to customer-faithful addressing needs a RETURN ROUTE on the lab/site edge.**
+   Moving a guest SSID from a lab subnet to the customer's real range is not just a WLAN edit — the
+   edge router and any NAT device must know the new range. Symptom: interception works (the gateway
+   returns its 302) but the portal itself is unreachable, which looks exactly like a cloud-side reject.
+2. **A saved capture URL is stale state.** Re-derive it from the live 302 on the real path and diff its
+   portal id against the profile. Replaying an earlier run's URL — especially from a different SSID —
+   invalidates every downstream measurement.
+
+**Origin (2026-08-29):** both faults at once. Nine hypotheses were spent on a clean configuration —
+device certificates, RADSec trust, cluster role, manual-vs-auto cluster, Identity Store, NAC config,
+shared secret, clock skew, NAS identity — three of which would have cost a rebuild.
+
+### 5p. `view_type=LOCAL` does NOT mean "only local objects"
+
+It returns the **effective** set — local overrides *and* inherited objects, mixed, with nothing in each
+object marking which is which. The only signal is `metadata.count_objects_in_module.{LOCAL,SHARED,ANY}`.
+
+- **A zero diff against the parent means "inherited", not "identical duplicate".** Never conclude an
+  override exists because a scoped read returned an object.
+- **`central_get_scope_tree` resource lists are effective too.** A site showing N resources is NOT proof
+  any of them are defined there. Do not plan a cleanup from that list.
+- **Every baseline of a scoped object must record the metadata counter**, or it cannot later be shown to
+  have been a real override.
+- Classify an orphaned override with `metadata.count_objects_in_module.LOCAL`. If it is 0 there is
+  nothing to clean, however many objects the read returned.
+
+**Positive confirmation that an object IS local:** a divergent vault handle for its passphrase, or
+diverged field values — inheritance cannot produce divergence.
 
 ### 5n. Reading RADIUS counters: `Rej` with `Tmout 0` PROVES the certificate was accepted
 
