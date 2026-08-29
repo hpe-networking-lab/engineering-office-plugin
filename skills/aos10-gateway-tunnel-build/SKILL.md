@@ -45,16 +45,17 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
-- §0. Ground yourself in the RIGHT doc set — first, always
+- §0. Ground yourself in the RIGHT doc set — first, always   `[doc-grounded]`
 - §0b. READ THIS FIRST — the Central configuration architecture
 - §1. The single most important fact
 - §1b. The SECOND most important fact — a tunnel-mode WLAN needs a gateway-cluster BINDING
 - §1c. `cluster-scope-id` — use the SITE, and never edit the binding in place
 - §2. Build order (New Central) — prerequisites BEFORE anything destructive   `[proven]` (item 3 and 5 validated 2026-08-29)
-- §3. When Central "cannot" change the gateway's uplink or system IP
+- §3. When Central "cannot" change the gateway's uplink or system IP   `[doc-grounded]`
 - §3b. Carrying a tagged client VLAN out of the gateway uplink
 - §4. What is device-owned vs Central-managed   `[proven]` — validated live 2026-08-29
 - §5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
@@ -89,7 +90,7 @@ Follow the order. Do not improvise.
 
 ---
 
-## 0. Ground yourself in the RIGHT doc set — first, always
+## 0. Ground yourself in the RIGHT doc set — first, always   `[doc-grounded]`
 
 **Check the URL contains `techdocs/new-central/`.** The Classic Central pages
 (`techdocs/central/.../aos10x/cfg/aps/gw-cfg-aos10.htm`, "Provisioning Gateways", Gateway Pools) open
@@ -97,7 +98,9 @@ with *"Classic Central offers the following options"* and scope Gateway Pools to
 do **not** apply to New-Central-managed devices. Reading the wrong doc set will send you down dead ends.
 
 Key pages:
-- Onboarding: `new-central/content/get-started/onboard-gws.htm`
+- Onboarding (verified 2026-08-29): https://arubanetworking.hpe.com/techdocs/new-central/content/get-started/onboard-gws.htm
+- Rename hostnames: https://developer.arubanetworks.com/new-central/docs/rename-hostnames
+- Central hierarchy: https://developer.arubanetworks.com/new-central/docs/new-central-hierarchy
 - Tunnel orchestrator: `aos/aos10/services/oto/`
 - Cluster formation / planning: `aos/aos10/design/gw-clusters/formation/` and `/planning/`
 
@@ -286,20 +289,23 @@ Per the onboarding doc, create these first. Skipping any of them can strand the 
                             ipv4-address: <default-gw-ip>, metric: 1}]
 4. **DNS Server profile** — mandatory. Without a resolver the gateway cannot resolve the conductor FQDN.
 5. **User Administration profile** — carries `mgmt-user admin`.
-   > **CORRECTED 2026-08-29 `[proven]`.** This previously read "it lives in the auto-imported config and
-   > is wiped by a reset." **False.** `central_get_scope_tree` places `management-users/Gateway-Admin` at
-   > **GLOBAL**, under the MOBILITY_GW persona — not at device scope. A device Reset Config does NOT wipe
-   > it; it is re-pushed from global. Same for **DNS**, which lives at SITE (`dns/CoA-DNS`). Treating
-   > either as device-scope rebuild work sends you to restore objects that were never lost. See §4.
+   > **`[doc-grounded]` 2026-08-29 — it depends on HOW the gateway was onboarded, see §4.**
+   > On an **auto-imported** gateway, User Administration IS device-scope and IS wiped by a Reset Config
+   > (the vendor sample table lists `User Administration: mgmt-user admin root …` among the objects saved
+   > to device scope). On a **pre-provisioned** gateway it is created at Global/Site Collection/Site and
+   > SURVIVES. Read the scope tree for the gateway in front of you — do not assume either.
+   > An intermediate version of this note claimed it is never device-scope. That was a single-observation
+   > over-generalisation and is withdrawn.
 
 Only then do anything that resets or re-syncs the device.
 
 ---
 
-## 3. When Central "cannot" change the gateway's uplink or system IP
+## 3. When Central "cannot" change the gateway's uplink or system IP   `[doc-grounded]`
 
 Look for a **Classic Central LOCAL OVERRIDE**. This is not a hybrid-cluster limitation — the New Central
-onboarding doc names it as a REQUIRED onboarding step:
+onboarding doc names it as a REQUIRED onboarding step (quote verified against the source 2026-08-29,
+https://arubanetworking.hpe.com/techdocs/new-central/content/get-started/onboard-gws.htm):
 
 > "Onboarding gateways requires an additional step of clicking **Reset Config** in the
 > **Configuration Audit > Local Overrides** page in Classic Central WebUI."
@@ -388,17 +394,27 @@ exactly these 9 resources:
 **CONFIRMED device-scope:** VLAN (layer2-vlan), L3 VLAN (vlan-interfaces), Static Routing,
 GW Interface Configuration (ethernet-interfaces), System Info, gw-system.
 
-**FALSIFIED — these are NOT device-scope, despite earlier versions of this section listing them:**
+**TWO PATHS put config at different scopes — this is what an earlier version of this section got wrong.**
 
-| Claimed | Actually lives at |
-|---|---|
-| **DNS** | **SITE** — `dns/CoA-DNS` at scope CoA-POC |
-| **User Administration** | **GLOBAL** — `management-users/Gateway-Admin` under the MOBILITY_GW persona |
+> **CORRECTION OF A CORRECTION (2026-08-29).** Earlier today I read the live scope tree, found `dns/CoA-DNS`
+> at SITE and `management-users/Gateway-Admin` at GLOBAL, and "falsified" the claim that DNS and User
+> Administration are device-scope. **That was wrong, and it was the single-observation error this skill
+> keeps warning about.** The vendor onboarding doc settles it — both paths are real:
 
-That distinction is load-bearing: a device Reset Config wipes device scope, so **DNS and the
-management user SURVIVE it** — they are re-pushed from site/global, not rebuilt by you. Treating them
-as device-scope rebuild work wastes effort and, worse, invites you to "restore" objects that were
-never lost.
+| Path | Where DNS / User Administration / System Information land | Source |
+|---|---|---|
+| **Auto-import** — the gateway had connectivity config and was moved into a New Central group | **DEVICE scope.** *"The auto-imported configurations will be saved to the device scope profiles… Auto-imported configurations are pushed only at the device level."* The doc's own sample table lists `User Administration: mgmt-user admin root …`, `DNS Server: ip name-server …`, `System Information: hostname 7210-GW2` | [onboard-gws.htm](https://arubanetworking.hpe.com/techdocs/new-central/content/get-started/onboard-gws.htm) — *Auto-Import of Basic Connectivity Configurations* |
+| **Pre-provision** — step 7 of the same doc | **Global / Site Collection / Site**, explicitly: *"create a DNS profile and assign to Global, Site Collections, or Site scope as required"*, same wording for User Administration and Gateway System | same doc, step 7.2 |
+
+**So: read the scope tree for THIS gateway rather than assuming either.** The CoA 9004 went the
+pre-provision route, so its DNS sits at SITE and its management user at GLOBAL — which is why a device
+Reset Config did not lose them **on this device**. On an auto-imported gateway they WOULD be device-scope
+and WOULD be wiped.
+
+> The doc also warns why this matters: *"Any configurations made at higher scopes for the same device will
+> be overridden at the device level during auto-import. If you want to move the configuration of the same
+> object to a higher scope, you must first create the same object at higher scope and then delete the
+> device-level object."*
 
 Other confirmed facts:
 - All ZTP ports land in **VLAN 4094**; the ZTP uplink is a DHCP client there. Normal.
