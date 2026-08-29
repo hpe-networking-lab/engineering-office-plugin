@@ -43,6 +43,8 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
@@ -62,14 +64,14 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect
 - §5f. Reading a client's VLAN and forcing a clean role re-test
 - §5g. A role only renders on the device if something REFERENCES it
-- §5h. Instruments: what to trust on an AOS 10 gateway
+- §5h. Instruments: what to trust on an AOS 10 gateway   `[proven]` — measured 2026-08-29
 - §5i. Scoped GET on `wlan-ssids` ignores the scope parameters
 - §5j. A site move silently orphans site-LOCAL WLAN overrides
 - §5k. The CANARY FIELD — how to tell "inert feature" from "never pushed"
 - §5l. Gateway SSH `mgmt-auth`: the field write is inert, the CONFIG REBUILD is the fix
 - §5m. PATCH merges, PUT replaces — the "merge-only API" rule is only half true
 - §6. Verification signature of a HEALTHY tunnel
-- §7. Cluster facts worth knowing before you touch one
+- §7. Cluster facts worth knowing before you touch one   `[proven]` — validated on-device 2026-08-29
 - §8. Create-only fields   `[observed-once]` — CONTESTED, see the schema note
 - §9. Working with an inherited handoff
 - §9b. Recreating a WLAN in the UI — scope and field traps
@@ -847,22 +849,22 @@ key onboarding around it.
 implemented for the MOBILITY_GW persona. *The config model accepting a field is not evidence the
 platform implements it for that device function.* Always confirm on the device.
 
-## 5h. Instruments: what to trust on an AOS 10 gateway
+## 5h. Instruments: what to trust on an AOS 10 gateway   `[proven]` — measured 2026-08-29
 
-- **`show configuration failure` emits NOTHING on an AOS 10 gateway** — no header, no
-  `Total Failures: 0`. It cannot distinguish "zero failures" from "not implemented". **Retired.**
-  Any rule keyed on it (including the old "Total Failures 0 => commit-confirm timeout" reading)
-  is withdrawn.
-- **`profmgr` is the reliable rejection log.** `show log system <n>`, then filter for `profmgr`
-  locally — the `| include` pipe is not supported (the CLI expects an integer).
-- `cfgm`'s `FD=-1: read audit file ...` appears on **successful** transitions too. It carries no
-  diagnostic weight.
-- **`central_show_commands` with `device_type='gateways'` returns real device output** and is the
-  fallback when SSH is unavailable. Parse it by slicing between `'output': '` and the **last**
-  `', 'command'` — embedded quotes break a naive terminator search.
-- **SSH `mgmt-auth` is device-owned and NOT modelled in Central.** A site move can reset it to
-  `public-key`, after which no password will ever work (`show ssh` -> `Mgmt User Authentication
-  Method public-key`) and Central has no lever to change it back. Budget for console access.
+| Question | Trust | Do NOT trust |
+|---|---|---|
+| What config objects exist at a scope? | `central_get_scope_tree` — walk to the node, read `resources` | `central_get_config_assignments(scope_id=<device>)` → `[]`; `central_get_system_info` → `{}`; `central_get_gateway_clusters(scope_id=<site>)` → `{}`. All three empty on objects that exist (§4a) |
+| Is an object LOCAL to this scope or inherited? | `metadata.count_objects_in_module.LOCAL`; a divergent vault handle or field value (inheritance cannot diverge) | a scoped GET returning the object, or a zero diff against the parent — scoped GETs return the EFFECTIVE view (§5p) |
+| Did my write reach the device? | a device `show` via `central_show_commands` | an API 200, or reading back through the same config API |
+| Is the cluster healthy? | `show lc-cluster group-membership` → `Cluster Enabled` + a real self address | the Central cluster object — a member missing `ip` reads back clean while the device says `Cluster Disabled` |
+| Is a tunnel anchoring clients? | a client in `show user-table` with `Forward mode: dtunnel` | `show ap database` / `show ap active` / the STM bucket map — AOS 8 constructs, empty by design here (§6, §7) |
+| Is a RADIUS/RADSec server actually failing? | `Tmout` and `AvgRspTm` — rejects with `Tmout 0` prove the server answered, so TLS and the cert are fine (§5n) | the `Rej` counter alone — guest MAC-auth rejects are DESIGNED |
+| Can the client reach the portal at all? | `curl` the portal FQDN **from the associated client** (§5o) | any NAC-side counter, until that returns something other than 000 |
+
+**`central_show_commands` parameter shape** — the `device_type` enum is
+`'aos-s' | 'aps' | 'cx' | 'gateways'`. **Lowercase plural.** `GATEWAY`, `gateway` and `MOBILITY_GW` all
+return `422`. This enum differs from every other Central tool's device-function enum
+(`CAMPUS_AP`, `MOBILITY_GW`, …) — getting it wrong looks like the device is unreachable.
 
 ## 5i. Scoped GET on `wlan-ssids` ignores the scope parameters
 
@@ -1066,24 +1068,43 @@ investigation on the strength of one cold packet.
 
 ---
 
-## 7. Cluster facts worth knowing before you touch one
+## 7. Cluster facts worth knowing before you touch one   `[proven]` — validated on-device 2026-08-29
 
-- A cluster **can consist of one or several gateways** — a single-node cluster is valid.
-- Central reports a lone node's role as **"Isoleader"** and treats it as normal, not an error.
-- Clusters are normally created **automatically at the group or the site level**. A manual cluster at
-  site-collection scope is permitted by the config model but is not the documented shape — call the
-  deviation out.
-- **The cluster member IP MUST equal the gateway's system IP.** A mismatch gives
-  "self-ip X not present ... cluster disabled". Restarting the device does NOT fix a member-IP mismatch.
-- The **bucket map published by the cluster leader** assigns each client's UDG.
-  **CORRECTED 2026-08-28:** an all-zero bucket map is NOT a fault on a single-node cluster. The values are
-  UAC *indices*, so with one gateway every bucket is `00` = "UAC 0" = the only gateway. Verified with two
-  tunnelled SSIDs carrying authenticated clients while the map read all zeros end to end. Only treat zeros
-  as a fault when the cluster has MORE THAN ONE member and you expect a spread.
+Measured on a live single-node 9004 via `central_show_commands(device_type="gateways")`:
+
+    show lc-cluster group-membership
+      Cluster Enabled, Profile Name = "<cluster-name>"
+      Heartbeat Threshold = 900 msec
+      Type IPv4 Address     Priority Connection-Type STATUS
+      self <gw-system-ip>   128      N/A             ISOLATED (Leader)
+
+    show controller-ip
+      Switch IPv4 Address: <gw-system-ip>
+      Switch IPv4 is configured to be vlan interface: 1
+      Switch IPv6 address is not configured.
+
+- **A single-node cluster is valid and reports `Cluster Enabled`.** CONFIRMED — one member, healthy,
+  carrying live tunnelled clients.
+- **A lone node's role is `ISOLATED (Leader)`** ("Isoleader" in the Central UI) and is NORMAL, not an
+  error. CONFIRMED on a working gateway.
+- **The cluster member IP MUST equal the gateway's system IP.** CONFIRMED: cluster `self` and
+  `show controller-ip` return the SAME address. The 2026-08-29 incident is the negative control — a
+  member written without its `ip` field rendered `controller-ip 0.0.0.0` and reported `Cluster
+  Disabled`, while the Central object read back clean. **Restarting the device does NOT fix a member-IP
+  mismatch.**
+- **`show ap database` is EMPTY on a healthy AOS 10 gateway.** CONFIRMED live, at the same moment the
+  cluster was Enabled and a client was anchored. AOS 10 gateways do not manage APs — the AP database,
+  `show ap active` and the STM bucket map are AOS 8 conductor constructs. Never use them as a done-test
+  (see §6).
+- The **bucket map** published by the leader assigns each client's UDG. An all-zero map is NOT a fault on
+  a single-node cluster: the values are UAC *indices*, so with one gateway every bucket is `00` = "UAC 0"
+  = the only gateway. Treat zeros as a fault only with MORE THAN ONE member and an expected spread.
 - A gateway MAC belongs to exactly one cluster; emptying `ipv4-gateways` does not release it — the old
-  cluster profile must be deleted.
-
----
+  cluster profile must be deleted.  `[observed-once]` — not re-tested, it needs a destructive action.
+- Clusters are normally created **automatically at group or site level**. A manual cluster at
+  site-collection scope is permitted by the config model but is not the documented shape — call the
+  deviation out. **Note:** `auto-cluster` cannot be enabled on a manually-created cluster
+  (`HTTP 400 validation failed`), so the choice is made at creation.
 
 ## 8. Create-only fields   `[observed-once]` — CONTESTED, see the schema note
 
