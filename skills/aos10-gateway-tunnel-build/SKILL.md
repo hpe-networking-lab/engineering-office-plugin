@@ -47,6 +47,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
@@ -75,10 +76,10 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §6. Verification signature of a HEALTHY tunnel
 - §7. Cluster facts worth knowing before you touch one   `[proven]` — validated on-device 2026-08-29
 - §8. Create-only fields   `[observed-once]` — CONTESTED, see the schema note
-- §9. Working with an inherited handoff
-- §9b. Recreating a WLAN in the UI — scope and field traps
-- §9c. Guest captive portal — what AOS 10 does and does not offer
-- §10. Recovery
+- §9. Working with an inherited handoff   `[proven]`
+- §9b. Recreating a WLAN in the UI — scope and field traps   `[doc-grounded]`
+- §9c. Guest captive portal — what AOS 10 does and does not offer   `[doc-grounded]`
+- §10. Recovery   `[proven]`
 - §11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID
 - §12. Reset Config on a gateway — the device-config rebuild runbook
 - §13. The reachability set for an AOS 10 gateway
@@ -1127,7 +1128,11 @@ Measured on a live single-node 9004 via `central_show_commands(device_type="gate
   = the only gateway. Treat zeros as a fault only with MORE THAN ONE member and an expected spread.
 - A gateway MAC belongs to exactly one cluster; emptying `ipv4-gateways` does not release it — the old
   cluster profile must be deleted.  `[observed-once]` — not re-tested, it needs a destructive action.
-- Clusters are normally created **automatically at group or site level**. A manual cluster at
+- Clusters are normally created **automatically at group or site level** — `[doc-grounded]`: "Auto group
+  clustering mode is the **default** clustering mode for Mobility and VPN Concentrator Gateway
+  configuration groups… assigned a unique cluster name using the `auto_group_XXX` format"
+  (arubanetworking.hpe.com/techdocs/aos/aos10/design/gw-clusters/modes/). A cluster NOT named
+  `auto_group_*` was created manually — that is a fast way to tell which mode you inherited. A manual cluster at
   site-collection scope is permitted by the config model but is not the documented shape — call the
   deviation out. **Note:** `auto-cluster` cannot be enabled on a manually-created cluster
   (`HTTP 400 validation failed`), so the choice is made at creation.
@@ -1179,7 +1184,7 @@ every scope.
 > documentation, or on a Central tenant explicitly confirmed lab-writable. Until then it is
 > `[observed-once]`, UI-scoped, and must not be used as a cost estimate for a rebuild decision.
 
-## 9. Working with an inherited handoff
+## 9. Working with an inherited handoff   `[proven]`
 
 Treat prior handoff/state documents as **claims to verify, not facts**. A real example: a handoff asserted
 "the gateway has no VLAN 1", "no ISAKMP SA means the AP isn't forming IPsec", and "the scratch SSID was
@@ -1191,12 +1196,14 @@ vendor doc that the metric indicates the thing you want (see §6 — `show ap ac
 
 ---
 
-## 9b. Recreating a WLAN in the UI — scope and field traps
+## 9b. Recreating a WLAN in the UI — scope and field traps   `[doc-grounded]`
 
 Recreating a WLAN to restore a create-only field is routine (§8). These will bite you during it:
 
 - **A tunnel-mode WLAN MUST be a Library (SHARED) profile. This is documented, not incidental.**
-  New Central config guide, *AOS-10 APs and Mobility Gateways Configuration*: "You must create tunnel-mode
+  New Central config guide, *AOS-10 APs and Mobility Gateways Configuration*
+  (https://arubanetworking.hpe.com/techdocs/hpe-central/content/GUID-FAF2269D-7777-45ED-908F-9E4C430A74E6.html
+  — **quote verified verbatim at source 2026-08-29**): "You must create tunnel-mode
   WLAN profiles in the **Library** and assign them to the **device groups** containing the APs that service
   the ESSID… Future updates will add support to assign WLAN profiles to any scope in the hierarchy,
   including Global, Site Collections, Sites, Devices, and Device Groups."
@@ -1230,7 +1237,7 @@ Recreating a WLAN to restore a create-only field is routine (§8). These will bi
 
 ---
 
-## 9c. Guest captive portal — what AOS 10 does and does not offer
+## 9c. Guest captive portal — what AOS 10 does and does not offer   `[doc-grounded]`
 
 Do NOT reason about this from the UI drop-downs; it is documented and the docs are unambiguous.
 
@@ -1257,7 +1264,11 @@ Do NOT reason about this from the UI drop-downs; it is documented and the docs a
 
 ---
 
-## 10. Recovery
+## 10. Recovery   `[proven]`
+
+**Confirmed on this platform 2026-08-29:** `show configuration` (saved/flash) returned 13,720 chars
+beginning `# Factory default config` on a fully-working gateway — Central-side config genuinely is not
+persisted to flash. See §12c for the measured post-reset state.
 
 If the gateway loses its path to Central (no DNS, bad uplink) and the CLI is ACP-locked, it may need a
 **power cycle** — Central-side config is not persisted to flash by the device, so it can come back on the
