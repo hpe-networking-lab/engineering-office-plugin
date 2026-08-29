@@ -1042,24 +1042,165 @@ Config ID advanced and `UPDATE SUCCESSFUL` was reported, and nothing changed —
 **no delta to push**. A Config ID that advances is not evidence your intent was applied. Always
 give the write a real difference, and prefer one you can see.
 
-## 5l. Gateway SSH `mgmt-auth` is NOT recoverable from Central — budget for console
+## 5l. Gateway SSH `mgmt-auth`: the field write is inert, the CONFIG REBUILD is the fix
 
-Established by the test in §5k. On an AOS 10 Mobility Gateway:
+**This section was wrong in its first revision and is corrected here.** It previously concluded
+"there is no Central-side lever, get console." Both halves were false. Keep the negative results,
+discard the remedy.
+
+### What is true (measured)
 
 - `mgmt-auth-public-key` / `mgmt-auth-uname-pwd` exist on the `local-management` object, validate,
-  push, and **do nothing**.
-- The default profile that carries them (`default_GW_profile`, Mobility Gateway / Global) **cannot
-  be edited** — the UI says so outright — and it reports both methods enabled while the device has
-  password auth disabled. Central's model and the device disagree, and the model does not win.
-- The `ssh mgmt-auth` lines are absent from flash (`show configuration`) **and** absent from the
-  Classic local override, yet they survive an AC power cycle. They are device-persistent state that
-  Central neither owns nor can reach.
+  push, and **do nothing** on a MOBILITY_GW. Proven with a canary (§5k).
+- The default profile carrying them (`default_GW_profile`, Mobility Gateway / Global) **cannot be
+  edited**, and reports both methods enabled while the device has password auth disabled.
+- The `ssh mgmt-auth` lines are absent from flash (`show configuration`) and absent from the Classic
+  local override, and they survive an AC power cycle.
 - SSH negotiates `publickey,keyboard-interactive`, so a password attempt looks like it should work
-  and returns `Permission denied`. Confirm with an actual authentication attempt before theorising.
+  and returns `Permission denied`. Confirm with a real authentication attempt before theorising.
 
-If a gateway lands on `Mgmt User Authentication Method  public-key`, **there is no Central-side
-lever.** Get console. Do not spend the day rescoping profiles.
+### What is ALSO true, and is the actual fix
 
-Corollary for planning: a gateway whose only remote CLI is telnet is one cleartext login away from
-an incident. Treat "SSH password auth is off and cannot be turned on remotely" as a **blocker to
-schedule console time for**, not a nuisance to work around.
+A **Reset Config on the device's local override** (§3) clears it. The device rebuilds its
+device-owned config from Central and comes back with:
+
+    Mgmt User Authentication Method     username/password public-key
+
+Verified 2026-08-29 on a 9004 that had been locked out since a site move.
+
+### Why "get console" was wrong
+
+Vendor documentation is explicit that the gateway CLI cannot make this change either:
+
+> "The management user of Aruba Gateways have restricted to access and troubleshoot only the device
+> related issues through the device user interface. Any other tasks such as configuration,
+> management, or device upgrade for a Gateway can be performed only from the Aruba Central UI."
+
+A console session is the same restricted CLI as SSH. Console buys **nothing** here. Do not schedule
+console time for a `mgmt-auth` lockout.
+
+### How to reason about it next time
+
+The diagnostic question is not "which Central field sets `ssh mgmt-auth`" — no reachable field does.
+It is **"did this ever work on this device, and what changed?"** If Central's model already carries
+the value you want (it did: `mgmt-auth-uname-pwd: true` at every scope) then the model is right and
+the DEVICE has drifted. Drift between a correct model and a wrong device is repaired by rebuilding
+the device's config, not by writing the field again.
+
+The trigger event is almost always a **site move, group move, or cluster rebuild** — the same class
+of event that orphans site-LOCAL overrides (§5j).
+
+**But read §12 before you pull the trigger.** Reset Config wipes every device-scope object, and the
+recovery is bigger than it looks.
+
+
+---
+
+## 12. Reset Config on a gateway — the device-config rebuild runbook
+
+Reset Config (Classic Central > Device > Config Audit > Manage local overrides > **Reset config**)
+is the documented remedy for device-owned config that has drifted from Central: a loopback System
+IP that New Central cannot change (§3), an `ssh mgmt-auth` lockout (§5l), and other device-owned
+state stranded by a site move.
+
+**It works. It also costs far more than the dialog implies, and the recovery has a required order.**
+The warning says "device specific configuration will be wiped." Take that literally: *every*
+device-scope object, including ones you did not create and are not thinking about.
+
+### 12a. The trap that makes prerequisite checks worthless
+
+§2 lists prerequisites (VLAN with a static IP, System IP VLAN, default route, DNS, mgmt user).
+The obvious move is to confirm all five are present, then reset. **That check proves nothing**,
+because on a gateway built the normal way those items ARE the device-scope config the reset is
+about to delete. You verify they exist, the reset removes them, and you are rebuilding from zero.
+
+> **Gate: before any action that wipes a scope, verify the prerequisites live at a scope the action
+> will NOT touch.** Global / site-collection / site / group config survives a device Reset Config.
+> Device-scope config does not. Enumerate which is which *first*, and plan to rebuild all of it.
+
+Read the scope column, not just the value:
+
+    central_get_config_assignments(scope_id=<device scope>)   -> everything here DIES
+    Config > Devices > <gateway> > ... "Inherits From: Self"   -> device scope, DIES
+    "Inherits From: Global / Site"                            -> survives
+
+### 12b. Capture before you reset
+
+Fingerprint the device and commit it somewhere durable (§5e step 1), plus the device-scope list:
+
+    show switches                 (Config ID, Configuration State)
+    show controller-ip            show ip interface brief      show ip route
+    show vlan                     show ip domain-name          show mgmt-user
+    show lc-cluster group-membership
+    show ap database              <- if Total APs is 0, the reload costs nothing; good window
+    show rights <ROLE>            show datapath tunnel
+
+**`show vlan` is the one people skip and then need.** It records which physical ports belong to
+which VLAN — the uplink port assignment — and that is device-scope config that will be wiped.
+
+Also confirm a recovery path exists: the device must be able to reach Central over **DHCP on the
+same switch port** after it boots blank.
+
+### 12c. The state you will actually find afterwards
+
+Measured on a 9004 (2026-08-29), post-reset, before any rebuild:
+
+    show controller-ip        -> 192.168.86.130, configured to be LOOPBACK interface
+    show ip interface brief   -> vlan 4094  192.168.86.38  up/up     (DHCP)
+                                 vlan 1     unassigned     up/DOWN
+                                 loopback   192.168.86.130
+    show vlan                 -> 1: GE0/0/1-0/3     4094: GE0/0/0
+    show switches             -> Config ID 0, UPDATE REQUIRED
+    device-scope assignments  -> EMPTY
+
+The device reverts to the **auto-import** posture: the uplink port GE0/0/0 goes back into
+**VLAN 4094 with DHCP**, and the System IP goes back to the **loopback**. Both are the §1 and §3b
+faults, re-created by the recovery action itself.
+
+### 12d. Rebuild ORDER — this is the part that bites
+
+The order is forced by two dependencies, one proven and one measured as a failure:
+
+1. **Uplink port first.** Put the uplink (GE0/0/0) back into its production VLAN as a **trunk**
+   with the correct native VLAN, and out of VLAN 4094 (§3b). Until this is done VLAN 1 owns no
+   port and stays `protocol DOWN`.
+2. **Then the VLAN's L3 static IP.**
+3. **Then the Gateway System profile** with IPv4 System IP VLAN = that VLAN.
+4. Then clean up the leftover **Loopback Profile** and **VLAN 4094** device-scope objects.
+5. The cluster re-forms on its own once the self-IP matches the member IP.
+
+**Do NOT do step 2 before step 1.** While GE0/0/0 is still in VLAN 4094 running DHCP, the lease
+frequently holds the very address you are about to configure statically on VLAN 1, and the push
+fails:
+
+    profmgr_app_cmd_failure: App error: "Error: IP address conflicts with another interface "
+      executing "ip address 192.168.86.38 255.255.255.0 "
+    fpapps: switchVlanIpAddrCfg: ADD request failed for address 192.168.86.38 on vlan 1, error 15
+    cfgm: update_failed_state: State(ACP(UP):CONFIG FAILURE:CFGID-171:...)
+
+That is a real, reproducible ordering failure, not a fluke — the DHCP server hands the gateway the
+same reserved address it always had, and AOS refuses to have it on two interfaces.
+
+**Step 3 cannot be done early either**, and the UI tells you so: a VLAN appears in the
+*IPv4 System IP VLAN* drop-down **only once it has a static IP** (§2). Before step 2 the drop-down
+offers only `None` and `VLAN 4094`; after step 2, `VLAN 1` appears. Treat that drop-down as a
+progress indicator for whether step 2 actually took.
+
+### 12e. Verify the end state
+
+    show controller-ip                -> "configured to be vlan interface: N"  (NOT loopback)
+    show ip interface brief           -> the VLAN holds the address; loopback gone or unused
+    show switches                     -> UPDATE SUCCESSFUL, non-zero Config ID
+    show lc-cluster group-membership  -> self <system-ip>, no "not present ... cluster disabled"
+    show log system <n> | profmgr     -> no App error lines for the new generation
+
+`CONFIG FAILURE(<id>)` in `show switches` names the failing generation; go straight to profmgr for
+the reason (§5h). It told the truth immediately in this case, on the first read.
+
+### 12f. When NOT to use Reset Config
+
+- To remove one specific line. Read the override diff first — it may not contain what you think.
+  It is a **whole-device rebuild**, not a surgical edit.
+- At a customer site, first. Do it in a lab, on a device you have rebuilt before.
+- Without console or physical access available, unless you have confirmed the DHCP recovery path.
+- While APs are anchored, unless the outage is planned — every tunnel drops and re-anchors.
