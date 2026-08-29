@@ -1008,3 +1008,58 @@ appear on 6 GHz. A 2.4/5-only test client cannot validate the band no matter wha
 
 Verify the transition half explicitly: the SSID should still scan as `WPA2 802.1X` and a legacy
 supplicant should still associate and authenticate.
+
+## 5k. The CANARY FIELD — how to tell "inert feature" from "never pushed"
+
+When a config-model write appears to do nothing on the device, there are two very different causes
+and they look identical: the object never reached the device (wrong scope, no delta, failed push),
+or it reached the device and the platform ignores that field.
+
+**Distinguish them by putting a second, independently observable field in the same object.**
+
+Worked example (2026-08-29). A scoped `local-management` (System Administration) profile was
+written at the gateway's scope to re-enable password SSH:
+```json
+{"mgmt-auth-public-key": false,
+ "mgmt-auth-uname-pwd": true,
+ "login-session-timeout": 22}      <- the canary
+```
+At the resulting Config ID, `UPDATE SUCCESSFUL`:
+```
+show running-config | include loginsession -> loginsession timeout 22    CANARY LANDED
+show running-config | include mgmt-auth    -> ssh mgmt-auth public-key
+                                              no ssh mgmt-auth username/password   UNCHANGED
+```
+The canary proves the object reached the device in that generation, so "wrong scope" and "failed
+push" are both excluded. The `mgmt-auth-*` fields are inert for MOBILITY_GW. Without the canary
+this is an ambiguous negative and you will go on rescoping and re-pushing for hours.
+
+Pick a canary that is **cheap, reversible, and visible in a `show` command** — a timeout, a
+description, a banner. Never a canary that changes forwarding or security posture.
+
+**Related trap in the same test:** the first attempt duplicated the default profile byte-for-byte.
+Config ID advanced and `UPDATE SUCCESSFUL` was reported, and nothing changed — because there was
+**no delta to push**. A Config ID that advances is not evidence your intent was applied. Always
+give the write a real difference, and prefer one you can see.
+
+## 5l. Gateway SSH `mgmt-auth` is NOT recoverable from Central — budget for console
+
+Established by the test in §5k. On an AOS 10 Mobility Gateway:
+
+- `mgmt-auth-public-key` / `mgmt-auth-uname-pwd` exist on the `local-management` object, validate,
+  push, and **do nothing**.
+- The default profile that carries them (`default_GW_profile`, Mobility Gateway / Global) **cannot
+  be edited** — the UI says so outright — and it reports both methods enabled while the device has
+  password auth disabled. Central's model and the device disagree, and the model does not win.
+- The `ssh mgmt-auth` lines are absent from flash (`show configuration`) **and** absent from the
+  Classic local override, yet they survive an AC power cycle. They are device-persistent state that
+  Central neither owns nor can reach.
+- SSH negotiates `publickey,keyboard-interactive`, so a password attempt looks like it should work
+  and returns `Permission denied`. Confirm with an actual authentication attempt before theorising.
+
+If a gateway lands on `Mgmt User Authentication Method  public-key`, **there is no Central-side
+lever.** Get console. Do not spend the day rescoping profiles.
+
+Corollary for planning: a gateway whose only remote CLI is telnet is one cleartext login away from
+an incident. Treat "SSH password auth is off and cannot be turned on remotely" as a **blocker to
+schedule console time for**, not a nuisance to work around.
