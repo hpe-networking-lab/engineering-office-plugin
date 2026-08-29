@@ -775,3 +775,236 @@ read out of an ambiguous doc sentence). All three are now sourced:
 
 **Do not report a capability question from UI presence or absence.** A drop-down tells you what this
 tenant exposes today; the doc tells you what the product does and why. Read §0 and go to the doc first.
+
+
+---
+
+## 5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect
+
+**Established 2026-08-28 by direct test.** A 9004 sat in `CONFIG FAILURE` across seventeen
+consecutive generations (CFGID-131 through 147), every one rejected on the same spurious
+`Unknown access-list '<policy-name>'` attach described in §5b. A full day was spent engineering
+around it: three config writes, a disproven hypothesis, and a near-miss on deleting a policy — the
+one action this runbook forbids.
+
+**A hard power-cycle cleared it in under two minutes.** The device returned `UPDATE SUCCESSFUL` at
+the same Config ID, holding *more* config than the stuck state did (66 session ACLs vs 61), with no
+`profmgr` errors in the post-boot log and identical system IP, VLANs and compiled policies.
+
+### Before engineering around a generation that keeps failing
+
+1. **Capture a baseline** — running-config fingerprint (size, `ip access-list session` count,
+   `user-role` count, VLAN IPs, `controller-ip`), `show switches`, `show rights <ROLE>`,
+   `show user-table`, `show datapath tunnel`, `show configuration`. Commit it somewhere durable,
+   not just a chat window.
+2. **Confirm a recovery path** — the device must be able to reach Central on its current network
+   (DHCP / ZTP), and hands must be available for console or LCD factory reset.
+3. **Power-cycle it, then diff against the baseline.**
+
+Do this **in a lab, never first at a customer site**, and never while the device is the only
+evidence of a working demo unless the baseline is committed.
+
+**The caution that delays this is reasonable and still wrong.** Flash on an ACP-managed gateway is
+*factory default*, so "will it come back at all" is a genuine question — it is only retired by
+testing it. The right answer to that risk is a controlled test with a baseline, not indefinite
+avoidance.
+
+### Corollary — the gateway does NOT retain config across a power cycle
+
+`show configuration` (flash) remains factory default after boot; the entire running-config is
+re-pulled from Central. Two consequences:
+
+- You **cannot** pre-stage a new system IP and then relocate the hardware. The device boots blank
+  and must reach Central before it holds anything.
+- **Relocation depends on DHCP + internet reachability on the new switch port at first plug-in.**
+  Make that an explicit, written requirement of any physical move, alongside the addressing itself.
+
+### Also observed
+
+The role's ACL number changed (89 -> 88) when the config was rebuilt after boot. ACL numbers are
+not stable identifiers across a rebuild — never cite one in documentation as though it were.
+
+---
+
+## 5e. PATCH merges, PUT replaces — the "merge-only API" rule is only half true
+
+Earlier revisions of this file (and several engagement records) state flatly that the Central
+config API "cannot clear a field" or "cannot remove a list entry". **That is true of PATCH only.**
+
+```
+PATCH  {object without the field}   -> field / list entries SURVIVE   (merge)
+PUT    {object without the field}   -> field REMOVED                  (full replace)  200
+```
+
+Verified on three object types: `management-users`, `wlan-ssids`, `server-groups`.
+
+**PUT is a full replace, so round-trip it safely:** GET the complete object, save it as a
+baseline, PUT it back with only the intended difference, then GET again and **diff every field**.
+On a live SSID this is the difference between a surgical edit and silently dropping defaults.
+
+**Two asymmetries that will bite:**
+
+- **Create fans out; delete does not.** Writing `assignment-rules` to a WLAN profile propagates
+  the rule to the gateway's server group automatically. Removing it from the WLAN does **not**
+  remove it from the server group — both objects must be PUT.
+- **Removal needs a second push cycle.** After the removing PUT the device may still render the
+  old value at the current Config ID; it clears on the next generation. Do not conclude a
+  removal failed from the first device read — wait for Config ID to advance again.
+
+Re-test the "never delete a policy a role references" hazard (§5b) against PUT before treating
+it as permanent; it was recorded on the PATCH-only assumption.
+
+## 5f. Reading a client's VLAN and forcing a clean role re-test
+
+**`show datapath station table` is the WRONG instrument for a derived VLAN.** It reports the
+802.11 association / VAP VLAN. A client whose role assigned VLAN 3115 still shows `VLAN 1` there
+if the VAP is on VLAN 1. Using it as evidence produces a confident, wrong "the role VLAN did not
+apply".
+
+**Use `show aaa debug vlan user mac <mac>`.** It lists every candidate VLAN, the derivation
+history in order, and names the winner:
+
+```
+VLAN types present for this User
+  Default VLAN                     : 1
+  Dot1x Server Rule Role Contained : 3115
+Current VLAN : 3115 (Dot1x Server Rule Role Contained)
+```
+
+The source string is the answer — `Dot1x Server Rule Role Contained` (role-carried VLAN),
+`Dot1x Aruba VSA` (Aruba-User-VLAN), `Default VLAN` (VAP), etc.
+
+**A gateway user entry survives the client disconnecting.** Re-running a role test on the same
+client can silently measure the *previous* test. Force the session out first:
+
+```
+aaa user delete mac <client-mac>      # exec command; works on an ACP-locked gateway
+show user-table | grep <mac>          # must return ZERO before re-associating
+```
+A role that *changes* between reads is trustworthy evidence; a role that stays the same on a
+stale entry is not.
+
+**ACL ids are not stable.** A role's `ACL Number` changes across config generations and site
+moves (observed 89 -> 88). Always re-read it from `show rights <ROLE>` rather than reusing a
+remembered id.
+
+## 5g. A role only renders on the device if something REFERENCES it
+
+Assigning a role at the correct scope is **not** sufficient. Central pushes a role only when
+some object references it — typically a WLAN's `auto-default-role`, `pre-auth-role`, or a Role
+Assignment Rule. An unreferenced role sits in the Library / at scope and never appears in
+`show rights`, so a RADIUS-returned role name that only exists in Central resolves to nothing and
+the client falls through to the 802.1X default role.
+
+**The cheap way to test a role attribute: put it on a role that already renders**, rather than
+creating a new role and fighting the render problem. Example: to prove role-assigned VLANs,
+add `vlan-type: VLAN_ID` + `access-vlan-id` to the role an existing SSID already derives, pick a
+VLAN that is a no-op for that SSID's own clients, and observe a *different* SSID's client move.
+
+### Role Assignment Rules ARE in the config model (correcting "UI-only")
+
+```json
+"assignment-rules": {"assignment-rule": [
+  {"sequence-id":1,"attribute":"CLASS","operator":"VALUE_OF","assign-action":"ASSIGN_ROLE"},
+  {"sequence-id":2,"attribute":"CLASS","operator":"MATCH_EQUAL","operand":"<value>",
+   "assign-action":"ASSIGN_ROLE","role":"<ROLE>"}
+]}
+```
+`VALUE_OF` = the UI's **"Is the Role"** (no operand, no role — the role name *is* the attribute
+value; equivalent to AOS 8 `set role condition <attr> value-of`). `MATCH_EQUAL` needs `operand`
+and `role`. They render on the gateway as server-group **Role/VLAN derivation rules**.
+
+An empty field in a GET is not evidence the feature is absent — it was absent only because no
+rule existed. Probe by writing one object, then re-read.
+
+### `Aruba-User-Vlan` is accepted as a role-derivation condition and does NOT derive a role
+
+Central accepts `attribute: ARUBA_USER_VLAN`, the rule renders on the device and reads
+`Validated: Yes`. A client then gets the **VLAN** (via the VSA, priority 17) and stays in the
+**802.1X default role** — the SDR never fires. `show aaa debug vlan user` shows only
+`Dot1x Aruba VSA`, with no SDR entry.
+
+Consequence for AOS 8 migrations: `set role condition Aruba-User-Vlan equals "<vlan>" set-value
+<ROLE>` does **not** port. Use `Aruba-User-Role` or `Class` instead.
+
+### `authorized-key` on `management-users` is modelled but inert
+
+`management-users/<name>` accepts `authorized-key: [{public-key: "<ssh key>"}]`. It reads back
+fine, produces **no configuration generation**, and never appears on the device. Do not plan SSH
+key onboarding around it.
+
+**Pattern:** three separate features this session were accepted by the config model and never
+implemented for the MOBILITY_GW persona. *The config model accepting a field is not evidence the
+platform implements it for that device function.* Always confirm on the device.
+
+## 5h. Instruments: what to trust on an AOS 10 gateway
+
+- **`show configuration failure` emits NOTHING on an AOS 10 gateway** — no header, no
+  `Total Failures: 0`. It cannot distinguish "zero failures" from "not implemented". **Retired.**
+  Any rule keyed on it (including the old "Total Failures 0 => commit-confirm timeout" reading)
+  is withdrawn.
+- **`profmgr` is the reliable rejection log.** `show log system <n>`, then filter for `profmgr`
+  locally — the `| include` pipe is not supported (the CLI expects an integer).
+- `cfgm`'s `FD=-1: read audit file ...` appears on **successful** transitions too. It carries no
+  diagnostic weight.
+- **`central_show_commands` with `device_type='gateways'` returns real device output** and is the
+  fallback when SSH is unavailable. Parse it by slicing between `'output': '` and the **last**
+  `', 'command'` — embedded quotes break a naive terminator search.
+- **SSH `mgmt-auth` is device-owned and NOT modelled in Central.** A site move can reset it to
+  `public-key`, after which no password will ever work (`show ssh` -> `Mgmt User Authentication
+  Method public-key`) and Central has no lever to change it back. Budget for console access.
+
+## 5i. Scoped GET on `wlan-ssids` ignores the scope parameters
+
+```
+GET /network-config/v1alpha1/wlan-ssids/<ssid>?object_type=LOCAL&scope_id=<id>&device_function=CAMPUS_AP
+```
+returns the **library** object regardless of the query parameters. It will hand you a
+plausible-looking "baseline" of a scoped override that is actually a different object — observed
+returning `WPA2_PERSONAL` for an override that was `WPA3_SAE`.
+
+Use `central_get_wlan_profiles(view_type='LOCAL', scope_id=..., device_function=...)` to read a
+scoped override.
+
+## 5j. A site move silently orphans site-LOCAL WLAN overrides
+
+When APs move to a different site, any site-**LOCAL** WLAN override at the old site stops
+applying — the AP falls back to the site-collection (or library) definition. Nothing warns you,
+and Central still displays the override.
+
+Signature: **Central says one security type, the air says another.** Confirm with a client scan
+(`nmcli dev wifi list`) rather than trusting the config model. Then either delete the orphaned
+override or recreate it at the scope that now serves the APs.
+
+## 11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID
+
+6 GHz forbids WPA2 and mandates PMF, so a `WPA2_ENTERPRISE` SSID cannot use the band at all.
+
+**Valid enterprise opmodes are only:**
+```
+WPA3_ENTERPRISE_CCM_128     <- standard WPA3-Enterprise; the right default
+WPA3_ENTERPRISE_GCM_256     <- CNSA 192-bit; needs specific client support
+```
+`WPA3_ENTERPRISE` and `WPA3_ENTERPRISE_TRANSITION` are **not** valid values. **Transition is a
+separate boolean, not an opmode.**
+
+Working recipe (verified, no impact on existing WPA2 clients):
+```json
+"opmode": "WPA3_ENTERPRISE_CCM_128",
+"wpa3-transition-mode-enable": true,
+"mfp-capable": true,
+"mfp-required": false,
+"rf-band": "BAND_ALL"
+```
+
+**`mfp-required` must stay false when using transition mode.** PMF-required globally locks out
+the WPA2-Enterprise clients that transition mode exists to serve on 2.4/5 GHz. The 6 GHz radio
+enforces PMF-required on its own regardless.
+
+`rf-band: BAND_ALL` is what includes 6 GHz (`24GHZ_5GHZ` is the common default). Confirm the
+radio profile contains `RADIO_6G`, and remember that **only Wi-Fi 6E/7 hardware has a 6 GHz
+radio** — AP-5xx/AP-3xx (Wi-Fi 6) do not, so an SSID can be perfectly configured and still never
+appear on 6 GHz. A 2.4/5-only test client cannot validate the band no matter what the AP does.
+
+Verify the transition half explicitly: the SSID should still scan as `WPA2 802.1X` and a legacy
+supplicant should still associate and authenticate.
