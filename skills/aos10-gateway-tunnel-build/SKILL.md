@@ -11,6 +11,44 @@ description: Build, change, or troubleshoot an HPE Aruba AOS 10 Mobility Gateway
 
 # AOS 10 Mobility Gateway + tunnel-mode WLAN — build and verify
 
+## CONTENTS
+
+- §0. Ground yourself in the RIGHT doc set — first, always
+- §0b. READ THIS FIRST — the Central configuration architecture
+- §1. The single most important fact
+- §1b. The SECOND most important fact — a tunnel-mode WLAN needs a gateway-cluster BINDING
+- §1c. `cluster-scope-id` — use the SITE, and never edit the binding in place
+- §2. Build order (New Central) — prerequisites BEFORE anything destructive
+- §3. When Central "cannot" change the gateway's uplink or system IP
+- §3b. Carrying a tagged client VLAN out of the gateway uplink
+- §4. What is device-owned vs Central-managed
+- §5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
+- §5b. HOW to actually read an ACP-locked gateway — the mechanics S5 assumes
+- §5c. Before diagnosing a tunnel WLAN, confirm a client is actually associated
+- §5d. Additional client VLANs on a shared AP↔gateway tunnel — what is established, and what is NOT
+- §5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect
+- §5f. Reading a client's VLAN and forcing a clean role re-test
+- §5g. A role only renders on the device if something REFERENCES it
+- §5h. Instruments: what to trust on an AOS 10 gateway
+- §5i. Scoped GET on `wlan-ssids` ignores the scope parameters
+- §5j. A site move silently orphans site-LOCAL WLAN overrides
+- §5k. The CANARY FIELD — how to tell "inert feature" from "never pushed"
+- §5l. Gateway SSH `mgmt-auth`: the field write is inert, the CONFIG REBUILD is the fix
+- §5m. PATCH merges, PUT replaces — the "merge-only API" rule is only half true
+- §6. Verification signature of a HEALTHY tunnel
+- §7. Cluster facts worth knowing before you touch one
+- §8. Create-only fields
+- §9. Working with an inherited handoff
+- §9b. Recreating a WLAN in the UI — scope and field traps
+- §9c. Guest captive portal — what AOS 10 does and does not offer
+- §10. Recovery
+- §11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID
+- §12. Reset Config on a gateway — the device-config rebuild runbook
+- §13. The reachability set for an AOS 10 gateway
+- §Provenance
+
+---
+
 Hard-won runbook. Every gate below was paid for with a real outage or a wrong conclusion.
 Follow the order. Do not improvise.
 
@@ -34,7 +72,7 @@ hours.
 
 ---
 
-## 0. READ THIS FIRST — the Central configuration architecture
+## 0b. READ THIS FIRST — the Central configuration architecture
 
 Before touching any Central object, hold the model:
 **`/lab/github/lab-documentation/reference/central-configuration-architecture.md`** — read and
@@ -306,58 +344,15 @@ The API validates server-side, so a wrong field name is rejected without reachin
   empty ssh result.
 
 
-### 4b. Device-scope CAPTURE and REBUILD — run this around ANY regenerating action
+### 4b. Around any REGENERATING action -> go to §12
 
-§4 says *what* is device-owned. This says what to DO about it. The facts in §2/§4 were present and
-correct while the same gateway was rebuilt six times in three days, each rebuild missing a different
-row — because a description is not a checklist.
+Reset config / site move / reload / a Central device-scope re-push are the SAME event: flash is
+factory-default, so each wipes the whole device-scope layer at once.
 
-**These are all the SAME event. Treat them identically:**
-Classic "Reset config" / local-override reset · site move between Central sites · reload or cold boot ·
-Central re-push of a device-scope profile.
-
-Flash on an ACP gateway is **factory-default** — the device persists nothing. Each of these wipes the
-whole device-scope layer at once.
-
-**Before the action — CAPTURE every row into the engagement record:**
-
-| # | Row | Capture with |
-|---|---|---|
-| 1 | Uplink port VLAN assignment (untagged + tagged) | `show vlan` |
-| 2 | Each VLAN's static IP | `show ip interface brief` |
-| 3 | System IP (which VLAN interface) | `show controller-ip` |
-| 4 | Default route | `show ip route` |
-| 5 | DNS resolvers | running config / `show ip domain-name` |
-| 6 | Cluster membership + self address | `show lc-cluster group-membership` |
-| 7 | management-users | `show mgmt-user` |
-| 8 | SSH mgmt-auth methods | `show ssh` |
-| 9 | Which VLANs are bridged-only (NO L3 here) | `show ip interface brief` — record the ABSENCE |
-| 10 | Every `overlay-wlan` `cluster-scope-id` | per-WLAN read |
-
-**A prerequisite check is worthless if your action is what removes it.** Verifying rows 1–8 are present
-and then running Reset Config proves nothing — those rows ARE device scope and the action deletes them.
-Classify each item by WHERE IT LIVES first; anything at the scope being wiped is not a prerequisite, it
-is rebuild work. Budget it and say plainly what will be destroyed.
-
-**After the action — REBUILD in this order. The order is load-bearing:**
-
-1. **Uplink port first.** Before any VLAN static IP. If the port comes back on a DHCP VLAN it leases the
-   address the static VLAN is configured to take, and the static commit then fails with no obvious cause.
-2. VLAN static IP → 3. Gateway System profile (System IP VLAN, never a loopback) → 4. Default route
-   (Gateway/AOS-S Parameters, per §2) → 5. DNS → 6. Cluster member — **include the `ip` field**, a member
-   without it reads back as a valid object while the device renders `controller-ip 0.0.0.0` and reports
-   `Cluster Disabled` → 7. management-users / SSH → 8. re-point every `overlay-wlan cluster-scope-id`.
-
-**Verify the management path before ANY feature check.** `show ip route` has a default, and
-`show lc-cluster group-membership` says *Cluster Enabled* with a real self address. Until both are true,
-nothing you observe about WLANs, roles or tunnels means anything.
-
-**Record the ABSENCES too (row 9).** A missing element is not evidence it belongs there. Do not add
-configuration to explain an absence — ground it in the authoritative source first. On a gateway that
-only bridges a client VLAN, adding an L3 interface there is a fault you are introducing, not repairing.
-
-Engagement-specific values (addresses, port numbers, cluster names) belong in a device-scope manifest in
-the **engagement** record — never in this skill.
+**The capture list, the scope-aware prerequisite trap, the measured post-reset state and the
+load-bearing rebuild order are all in §12.** Do not re-derive them here.
+Reachability set: §13. Engagement-specific values (addresses, ports, cluster names) belong in a
+device-scope manifest in the ENGAGEMENT record, never in this skill.
 
 ---
 
@@ -632,6 +627,290 @@ VLAN's IP address, the role ACL, and a full WLAN rebuild.
 **`gre0` showing a single VLAN is not the limit** — it still reads `VLANs 1` while a dedicated client
 VLAN forwards correctly. Treat it as a symptom, never a constraint.
 
+## 5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect
+
+**Established 2026-08-28 by direct test.** A 9004 sat in `CONFIG FAILURE` across seventeen
+consecutive generations (CFGID-131 through 147), every one rejected on the same spurious
+`Unknown access-list '<policy-name>'` attach described in §5b. A full day was spent engineering
+around it: three config writes, a disproven hypothesis, and a near-miss on deleting a policy — the
+one action this runbook forbids.
+
+**A hard power-cycle cleared it in under two minutes.** The device returned `UPDATE SUCCESSFUL` at
+the same Config ID, holding *more* config than the stuck state did (66 session ACLs vs 61), with no
+`profmgr` errors in the post-boot log and identical system IP, VLANs and compiled policies.
+
+### Before engineering around a generation that keeps failing
+
+1. **Capture a baseline** — running-config fingerprint (size, `ip access-list session` count,
+   `user-role` count, VLAN IPs, `controller-ip`), `show switches`, `show rights <ROLE>`,
+   `show user-table`, `show datapath tunnel`, `show configuration`. Commit it somewhere durable,
+   not just a chat window.
+2. **Confirm a recovery path** — the device must be able to reach Central on its current network
+   (DHCP / ZTP), and hands must be available for console or LCD factory reset.
+3. **Power-cycle it, then diff against the baseline.**
+
+Do this **in a lab, never first at a customer site**, and never while the device is the only
+evidence of a working demo unless the baseline is committed.
+
+**The caution that delays this is reasonable and still wrong.** Flash on an ACP-managed gateway is
+*factory default*, so "will it come back at all" is a genuine question — it is only retired by
+testing it. The right answer to that risk is a controlled test with a baseline, not indefinite
+avoidance.
+
+### Corollary — the gateway does NOT retain config across a power cycle
+
+`show configuration` (flash) remains factory default after boot; the entire running-config is
+re-pulled from Central. Two consequences:
+
+- You **cannot** pre-stage a new system IP and then relocate the hardware. The device boots blank
+  and must reach Central before it holds anything.
+- **Relocation depends on DHCP + internet reachability on the new switch port at first plug-in.**
+  Make that an explicit, written requirement of any physical move, alongside the addressing itself.
+
+### Also observed
+
+The role's ACL number changed (89 -> 88) when the config was rebuilt after boot. ACL numbers are
+not stable identifiers across a rebuild — never cite one in documentation as though it were.
+
+---
+
+## 5f. Reading a client's VLAN and forcing a clean role re-test
+
+**`show datapath station table` is the WRONG instrument for a derived VLAN.** It reports the
+802.11 association / VAP VLAN. A client whose role assigned VLAN 3115 still shows `VLAN 1` there
+if the VAP is on VLAN 1. Using it as evidence produces a confident, wrong "the role VLAN did not
+apply".
+
+**Use `show aaa debug vlan user mac <mac>`.** It lists every candidate VLAN, the derivation
+history in order, and names the winner:
+
+```
+VLAN types present for this User
+  Default VLAN                     : 1
+  Dot1x Server Rule Role Contained : 3115
+Current VLAN : 3115 (Dot1x Server Rule Role Contained)
+```
+
+The source string is the answer — `Dot1x Server Rule Role Contained` (role-carried VLAN),
+`Dot1x Aruba VSA` (Aruba-User-VLAN), `Default VLAN` (VAP), etc.
+
+**A gateway user entry survives the client disconnecting.** Re-running a role test on the same
+client can silently measure the *previous* test. Force the session out first:
+
+```
+aaa user delete mac <client-mac>      # exec command; works on an ACP-locked gateway
+show user-table | grep <mac>          # must return ZERO before re-associating
+```
+A role that *changes* between reads is trustworthy evidence; a role that stays the same on a
+stale entry is not.
+
+**ACL ids are not stable.** A role's `ACL Number` changes across config generations and site
+moves (observed 89 -> 88). Always re-read it from `show rights <ROLE>` rather than reusing a
+remembered id.
+
+## 5g. A role only renders on the device if something REFERENCES it
+
+Assigning a role at the correct scope is **not** sufficient. Central pushes a role only when
+some object references it — typically a WLAN's `auto-default-role`, `pre-auth-role`, or a Role
+Assignment Rule. An unreferenced role sits in the Library / at scope and never appears in
+`show rights`, so a RADIUS-returned role name that only exists in Central resolves to nothing and
+the client falls through to the 802.1X default role.
+
+**The cheap way to test a role attribute: put it on a role that already renders**, rather than
+creating a new role and fighting the render problem. Example: to prove role-assigned VLANs,
+add `vlan-type: VLAN_ID` + `access-vlan-id` to the role an existing SSID already derives, pick a
+VLAN that is a no-op for that SSID's own clients, and observe a *different* SSID's client move.
+
+### Role Assignment Rules ARE in the config model (correcting "UI-only")
+
+```json
+"assignment-rules": {"assignment-rule": [
+  {"sequence-id":1,"attribute":"CLASS","operator":"VALUE_OF","assign-action":"ASSIGN_ROLE"},
+  {"sequence-id":2,"attribute":"CLASS","operator":"MATCH_EQUAL","operand":"<value>",
+   "assign-action":"ASSIGN_ROLE","role":"<ROLE>"}
+]}
+```
+`VALUE_OF` = the UI's **"Is the Role"** (no operand, no role — the role name *is* the attribute
+value; equivalent to AOS 8 `set role condition <attr> value-of`). `MATCH_EQUAL` needs `operand`
+and `role`. They render on the gateway as server-group **Role/VLAN derivation rules**.
+
+An empty field in a GET is not evidence the feature is absent — it was absent only because no
+rule existed. Probe by writing one object, then re-read.
+
+### `Aruba-User-Vlan` is accepted as a role-derivation condition and does NOT derive a role
+
+Central accepts `attribute: ARUBA_USER_VLAN`, the rule renders on the device and reads
+`Validated: Yes`. A client then gets the **VLAN** (via the VSA, priority 17) and stays in the
+**802.1X default role** — the SDR never fires. `show aaa debug vlan user` shows only
+`Dot1x Aruba VSA`, with no SDR entry.
+
+Consequence for AOS 8 migrations: `set role condition Aruba-User-Vlan equals "<vlan>" set-value
+<ROLE>` does **not** port. Use `Aruba-User-Role` or `Class` instead.
+
+### `authorized-key` on `management-users` is modelled but inert
+
+`management-users/<name>` accepts `authorized-key: [{public-key: "<ssh key>"}]`. It reads back
+fine, produces **no configuration generation**, and never appears on the device. Do not plan SSH
+key onboarding around it.
+
+**Pattern:** three separate features this session were accepted by the config model and never
+implemented for the MOBILITY_GW persona. *The config model accepting a field is not evidence the
+platform implements it for that device function.* Always confirm on the device.
+
+## 5h. Instruments: what to trust on an AOS 10 gateway
+
+- **`show configuration failure` emits NOTHING on an AOS 10 gateway** — no header, no
+  `Total Failures: 0`. It cannot distinguish "zero failures" from "not implemented". **Retired.**
+  Any rule keyed on it (including the old "Total Failures 0 => commit-confirm timeout" reading)
+  is withdrawn.
+- **`profmgr` is the reliable rejection log.** `show log system <n>`, then filter for `profmgr`
+  locally — the `| include` pipe is not supported (the CLI expects an integer).
+- `cfgm`'s `FD=-1: read audit file ...` appears on **successful** transitions too. It carries no
+  diagnostic weight.
+- **`central_show_commands` with `device_type='gateways'` returns real device output** and is the
+  fallback when SSH is unavailable. Parse it by slicing between `'output': '` and the **last**
+  `', 'command'` — embedded quotes break a naive terminator search.
+- **SSH `mgmt-auth` is device-owned and NOT modelled in Central.** A site move can reset it to
+  `public-key`, after which no password will ever work (`show ssh` -> `Mgmt User Authentication
+  Method public-key`) and Central has no lever to change it back. Budget for console access.
+
+## 5i. Scoped GET on `wlan-ssids` ignores the scope parameters
+
+```
+GET /network-config/v1alpha1/wlan-ssids/<ssid>?object_type=LOCAL&scope_id=<id>&device_function=CAMPUS_AP
+```
+returns the **library** object regardless of the query parameters. It will hand you a
+plausible-looking "baseline" of a scoped override that is actually a different object — observed
+returning `WPA2_PERSONAL` for an override that was `WPA3_SAE`.
+
+Use `central_get_wlan_profiles(view_type='LOCAL', scope_id=..., device_function=...)` to read a
+scoped override.
+
+## 5j. A site move silently orphans site-LOCAL WLAN overrides
+
+When APs move to a different site, any site-**LOCAL** WLAN override at the old site stops
+applying — the AP falls back to the site-collection (or library) definition. Nothing warns you,
+and Central still displays the override.
+
+Signature: **Central says one security type, the air says another.** Confirm with a client scan
+(`nmcli dev wifi list`) rather than trusting the config model. Then either delete the orphaned
+override or recreate it at the scope that now serves the APs.
+
+## 5k. The CANARY FIELD — how to tell "inert feature" from "never pushed"
+
+When a config-model write appears to do nothing on the device, there are two very different causes
+and they look identical: the object never reached the device (wrong scope, no delta, failed push),
+or it reached the device and the platform ignores that field.
+
+**Distinguish them by putting a second, independently observable field in the same object.**
+
+Worked example (2026-08-29). A scoped `local-management` (System Administration) profile was
+written at the gateway's scope to re-enable password SSH:
+```json
+{"mgmt-auth-public-key": false,
+ "mgmt-auth-uname-pwd": true,
+ "login-session-timeout": 22}      <- the canary
+```
+At the resulting Config ID, `UPDATE SUCCESSFUL`:
+```
+show running-config | include loginsession -> loginsession timeout 22    CANARY LANDED
+show running-config | include mgmt-auth    -> ssh mgmt-auth public-key
+                                              no ssh mgmt-auth username/password   UNCHANGED
+```
+The canary proves the object reached the device in that generation, so "wrong scope" and "failed
+push" are both excluded. The `mgmt-auth-*` fields are inert for MOBILITY_GW. Without the canary
+this is an ambiguous negative and you will go on rescoping and re-pushing for hours.
+
+Pick a canary that is **cheap, reversible, and visible in a `show` command** — a timeout, a
+description, a banner. Never a canary that changes forwarding or security posture.
+
+**Related trap in the same test:** the first attempt duplicated the default profile byte-for-byte.
+Config ID advanced and `UPDATE SUCCESSFUL` was reported, and nothing changed — because there was
+**no delta to push**. A Config ID that advances is not evidence your intent was applied. Always
+give the write a real difference, and prefer one you can see.
+
+## 5l. Gateway SSH `mgmt-auth`: the field write is inert, the CONFIG REBUILD is the fix
+
+**This section was wrong in its first revision and is corrected here.** It previously concluded
+"there is no Central-side lever, get console." Both halves were false. Keep the negative results,
+discard the remedy.
+
+### What is true (measured)
+
+- `mgmt-auth-public-key` / `mgmt-auth-uname-pwd` exist on the `local-management` object, validate,
+  push, and **do nothing** on a MOBILITY_GW. Proven with a canary (§5k).
+- The default profile carrying them (`default_GW_profile`, Mobility Gateway / Global) **cannot be
+  edited**, and reports both methods enabled while the device has password auth disabled.
+- The `ssh mgmt-auth` lines are absent from flash (`show configuration`) and absent from the Classic
+  local override, and they survive an AC power cycle.
+- SSH negotiates `publickey,keyboard-interactive`, so a password attempt looks like it should work
+  and returns `Permission denied`. Confirm with a real authentication attempt before theorising.
+
+### What is ALSO true, and is the actual fix
+
+A **Reset Config on the device's local override** (§3) clears it. The device rebuilds its
+device-owned config from Central and comes back with:
+
+    Mgmt User Authentication Method     username/password public-key
+
+Verified 2026-08-29 on a 9004 that had been locked out since a site move.
+
+### Why "get console" was wrong
+
+Vendor documentation is explicit that the gateway CLI cannot make this change either:
+
+> "The management user of Aruba Gateways have restricted to access and troubleshoot only the device
+> related issues through the device user interface. Any other tasks such as configuration,
+> management, or device upgrade for a Gateway can be performed only from the Aruba Central UI."
+
+A console session is the same restricted CLI as SSH. Console buys **nothing** here. Do not schedule
+console time for a `mgmt-auth` lockout.
+
+### How to reason about it next time
+
+The diagnostic question is not "which Central field sets `ssh mgmt-auth`" — no reachable field does.
+It is **"did this ever work on this device, and what changed?"** If Central's model already carries
+the value you want (it did: `mgmt-auth-uname-pwd: true` at every scope) then the model is right and
+the DEVICE has drifted. Drift between a correct model and a wrong device is repaired by rebuilding
+the device's config, not by writing the field again.
+
+The trigger event is almost always a **site move, group move, or cluster rebuild** — the same class
+of event that orphans site-LOCAL overrides (§5j).
+
+**But read §12 before you pull the trigger.** Reset Config wipes every device-scope object, and the
+recovery is bigger than it looks.
+
+
+---
+
+## 5m. PATCH merges, PUT replaces — the "merge-only API" rule is only half true
+
+Earlier revisions of this file (and several engagement records) state flatly that the Central
+config API "cannot clear a field" or "cannot remove a list entry". **That is true of PATCH only.**
+
+```
+PATCH  {object without the field}   -> field / list entries SURVIVE   (merge)
+PUT    {object without the field}   -> field REMOVED                  (full replace)  200
+```
+
+Verified on three object types: `management-users`, `wlan-ssids`, `server-groups`.
+
+**PUT is a full replace, so round-trip it safely:** GET the complete object, save it as a
+baseline, PUT it back with only the intended difference, then GET again and **diff every field**.
+On a live SSID this is the difference between a surgical edit and silently dropping defaults.
+
+**Two asymmetries that will bite:**
+
+- **Create fans out; delete does not.** Writing `assignment-rules` to a WLAN profile propagates
+  the rule to the gateway's server group automatically. Removing it from the WLAN does **not**
+  remove it from the server group — both objects must be PUT.
+- **Removal needs a second push cycle.** After the removing PUT the device may still render the
+  old value at the current Config ID; it clears on the next generation. Do not conclude a
+  removal failed from the first device read — wait for Config ID to advance again.
+
+Re-test the "never delete a policy a role references" hazard (§5b) against PUT before treating
+it as permanent; it was recorded on the PATCH-only assumption.
+
 ## 6. Verification signature of a HEALTHY tunnel
 
 Gateway:
@@ -813,244 +1092,6 @@ box, so make sure §2 is complete before you create that situation.
 
 ---
 
-## Provenance
-
-Built from a live AOS 10 gateway + tunnel-mode WLAN engagement (2026-08-27). Sections 5 and 9 restate
-universal Engineering Office gates at the point of use; the canonical statements live in the guardrails
-(`eo-guardrails`) and in the practice's LESSONS record. If they ever disagree, the canonical record wins —
-fix this file.
-
-**Revised 2026-08-27 (same day, second pass) after tunnel mode was PROVEN end to end.** Added §1b
-(the gateway-cluster / `overlay-wlan` binding), §9b (UI scope and field traps when recreating a WLAN), the
-`dtunnel` success evidence and the `aaa test-server` probe technique in §6.
-
-The first pass of this runbook was correct about §1 (loopback System IP) but silent on the second fault,
-and that gap cost a full session: with the loopback already fixed, a tunnel-mode WLAN that had NO gateway
-cluster bound presented as "the tunnel orchestrator does not work in this hybrid tenant" — which was
-written into an engagement DECISIONS.md as a platform limitation and went unchallenged for two days. It
-was not a platform limitation. §6 previously implied `show ap bss-table` was a valid gateway-side check;
-on the gateway it reads `Num APs: 0` even with a live tunnelled client, which is exactly the false signal
-that produced the wrong conclusion. That line is now corrected.
-
-Standing lesson this file exists to prevent: **if every documented prerequisite reads green and the
-product still does not work, suspect your own setup — not the product — and never commit "X cannot be
-done" to a design record without a named mechanism and an explicit re-test trigger.**
-
-**Third pass, same day — grounded in the vendor docs after the Human rejected trial-and-error findings.**
-§9b's shared-vs-local rule and §9c (guest captive portal) were originally derived by clicking through the
-UI. That produced the right answers twice and a WRONG answer once (an invented "AP-hosted portal" option,
-read out of an ambiguous doc sentence). All three are now sourced:
-
-- new-central `get-started/cfg-guides-ap-gw.htm` — tunnel WLANs must be Library profiles assigned to the
-  AP device group; Tunnel is mandatory for AP+Mobility Gateway deployments; Security Levels are
-  Enterprise / Personal / Open only.
-- aos10x `cfg/cfg-wlan-overlay.htm` — APs are authenticators, the gateway is an authentication proxy.
-- aos10x `cfg/aps/conf_guest_ssids.htm` — the only two splash page profiles are External and Cloud Guest.
-- aos10x `cfg/security/authentication/l3-cptv-prtl-conf.htm` — the gateway captive-portal profile is the
-  Branch Gateway path.
-
-**Do not report a capability question from UI presence or absence.** A drop-down tells you what this
-tenant exposes today; the doc tells you what the product does and why. Read §0 and go to the doc first.
-
-
----
-
-## 5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect
-
-**Established 2026-08-28 by direct test.** A 9004 sat in `CONFIG FAILURE` across seventeen
-consecutive generations (CFGID-131 through 147), every one rejected on the same spurious
-`Unknown access-list '<policy-name>'` attach described in §5b. A full day was spent engineering
-around it: three config writes, a disproven hypothesis, and a near-miss on deleting a policy — the
-one action this runbook forbids.
-
-**A hard power-cycle cleared it in under two minutes.** The device returned `UPDATE SUCCESSFUL` at
-the same Config ID, holding *more* config than the stuck state did (66 session ACLs vs 61), with no
-`profmgr` errors in the post-boot log and identical system IP, VLANs and compiled policies.
-
-### Before engineering around a generation that keeps failing
-
-1. **Capture a baseline** — running-config fingerprint (size, `ip access-list session` count,
-   `user-role` count, VLAN IPs, `controller-ip`), `show switches`, `show rights <ROLE>`,
-   `show user-table`, `show datapath tunnel`, `show configuration`. Commit it somewhere durable,
-   not just a chat window.
-2. **Confirm a recovery path** — the device must be able to reach Central on its current network
-   (DHCP / ZTP), and hands must be available for console or LCD factory reset.
-3. **Power-cycle it, then diff against the baseline.**
-
-Do this **in a lab, never first at a customer site**, and never while the device is the only
-evidence of a working demo unless the baseline is committed.
-
-**The caution that delays this is reasonable and still wrong.** Flash on an ACP-managed gateway is
-*factory default*, so "will it come back at all" is a genuine question — it is only retired by
-testing it. The right answer to that risk is a controlled test with a baseline, not indefinite
-avoidance.
-
-### Corollary — the gateway does NOT retain config across a power cycle
-
-`show configuration` (flash) remains factory default after boot; the entire running-config is
-re-pulled from Central. Two consequences:
-
-- You **cannot** pre-stage a new system IP and then relocate the hardware. The device boots blank
-  and must reach Central before it holds anything.
-- **Relocation depends on DHCP + internet reachability on the new switch port at first plug-in.**
-  Make that an explicit, written requirement of any physical move, alongside the addressing itself.
-
-### Also observed
-
-The role's ACL number changed (89 -> 88) when the config was rebuilt after boot. ACL numbers are
-not stable identifiers across a rebuild — never cite one in documentation as though it were.
-
----
-
-## 5e. PATCH merges, PUT replaces — the "merge-only API" rule is only half true
-
-Earlier revisions of this file (and several engagement records) state flatly that the Central
-config API "cannot clear a field" or "cannot remove a list entry". **That is true of PATCH only.**
-
-```
-PATCH  {object without the field}   -> field / list entries SURVIVE   (merge)
-PUT    {object without the field}   -> field REMOVED                  (full replace)  200
-```
-
-Verified on three object types: `management-users`, `wlan-ssids`, `server-groups`.
-
-**PUT is a full replace, so round-trip it safely:** GET the complete object, save it as a
-baseline, PUT it back with only the intended difference, then GET again and **diff every field**.
-On a live SSID this is the difference between a surgical edit and silently dropping defaults.
-
-**Two asymmetries that will bite:**
-
-- **Create fans out; delete does not.** Writing `assignment-rules` to a WLAN profile propagates
-  the rule to the gateway's server group automatically. Removing it from the WLAN does **not**
-  remove it from the server group — both objects must be PUT.
-- **Removal needs a second push cycle.** After the removing PUT the device may still render the
-  old value at the current Config ID; it clears on the next generation. Do not conclude a
-  removal failed from the first device read — wait for Config ID to advance again.
-
-Re-test the "never delete a policy a role references" hazard (§5b) against PUT before treating
-it as permanent; it was recorded on the PATCH-only assumption.
-
-## 5f. Reading a client's VLAN and forcing a clean role re-test
-
-**`show datapath station table` is the WRONG instrument for a derived VLAN.** It reports the
-802.11 association / VAP VLAN. A client whose role assigned VLAN 3115 still shows `VLAN 1` there
-if the VAP is on VLAN 1. Using it as evidence produces a confident, wrong "the role VLAN did not
-apply".
-
-**Use `show aaa debug vlan user mac <mac>`.** It lists every candidate VLAN, the derivation
-history in order, and names the winner:
-
-```
-VLAN types present for this User
-  Default VLAN                     : 1
-  Dot1x Server Rule Role Contained : 3115
-Current VLAN : 3115 (Dot1x Server Rule Role Contained)
-```
-
-The source string is the answer — `Dot1x Server Rule Role Contained` (role-carried VLAN),
-`Dot1x Aruba VSA` (Aruba-User-VLAN), `Default VLAN` (VAP), etc.
-
-**A gateway user entry survives the client disconnecting.** Re-running a role test on the same
-client can silently measure the *previous* test. Force the session out first:
-
-```
-aaa user delete mac <client-mac>      # exec command; works on an ACP-locked gateway
-show user-table | grep <mac>          # must return ZERO before re-associating
-```
-A role that *changes* between reads is trustworthy evidence; a role that stays the same on a
-stale entry is not.
-
-**ACL ids are not stable.** A role's `ACL Number` changes across config generations and site
-moves (observed 89 -> 88). Always re-read it from `show rights <ROLE>` rather than reusing a
-remembered id.
-
-## 5g. A role only renders on the device if something REFERENCES it
-
-Assigning a role at the correct scope is **not** sufficient. Central pushes a role only when
-some object references it — typically a WLAN's `auto-default-role`, `pre-auth-role`, or a Role
-Assignment Rule. An unreferenced role sits in the Library / at scope and never appears in
-`show rights`, so a RADIUS-returned role name that only exists in Central resolves to nothing and
-the client falls through to the 802.1X default role.
-
-**The cheap way to test a role attribute: put it on a role that already renders**, rather than
-creating a new role and fighting the render problem. Example: to prove role-assigned VLANs,
-add `vlan-type: VLAN_ID` + `access-vlan-id` to the role an existing SSID already derives, pick a
-VLAN that is a no-op for that SSID's own clients, and observe a *different* SSID's client move.
-
-### Role Assignment Rules ARE in the config model (correcting "UI-only")
-
-```json
-"assignment-rules": {"assignment-rule": [
-  {"sequence-id":1,"attribute":"CLASS","operator":"VALUE_OF","assign-action":"ASSIGN_ROLE"},
-  {"sequence-id":2,"attribute":"CLASS","operator":"MATCH_EQUAL","operand":"<value>",
-   "assign-action":"ASSIGN_ROLE","role":"<ROLE>"}
-]}
-```
-`VALUE_OF` = the UI's **"Is the Role"** (no operand, no role — the role name *is* the attribute
-value; equivalent to AOS 8 `set role condition <attr> value-of`). `MATCH_EQUAL` needs `operand`
-and `role`. They render on the gateway as server-group **Role/VLAN derivation rules**.
-
-An empty field in a GET is not evidence the feature is absent — it was absent only because no
-rule existed. Probe by writing one object, then re-read.
-
-### `Aruba-User-Vlan` is accepted as a role-derivation condition and does NOT derive a role
-
-Central accepts `attribute: ARUBA_USER_VLAN`, the rule renders on the device and reads
-`Validated: Yes`. A client then gets the **VLAN** (via the VSA, priority 17) and stays in the
-**802.1X default role** — the SDR never fires. `show aaa debug vlan user` shows only
-`Dot1x Aruba VSA`, with no SDR entry.
-
-Consequence for AOS 8 migrations: `set role condition Aruba-User-Vlan equals "<vlan>" set-value
-<ROLE>` does **not** port. Use `Aruba-User-Role` or `Class` instead.
-
-### `authorized-key` on `management-users` is modelled but inert
-
-`management-users/<name>` accepts `authorized-key: [{public-key: "<ssh key>"}]`. It reads back
-fine, produces **no configuration generation**, and never appears on the device. Do not plan SSH
-key onboarding around it.
-
-**Pattern:** three separate features this session were accepted by the config model and never
-implemented for the MOBILITY_GW persona. *The config model accepting a field is not evidence the
-platform implements it for that device function.* Always confirm on the device.
-
-## 5h. Instruments: what to trust on an AOS 10 gateway
-
-- **`show configuration failure` emits NOTHING on an AOS 10 gateway** — no header, no
-  `Total Failures: 0`. It cannot distinguish "zero failures" from "not implemented". **Retired.**
-  Any rule keyed on it (including the old "Total Failures 0 => commit-confirm timeout" reading)
-  is withdrawn.
-- **`profmgr` is the reliable rejection log.** `show log system <n>`, then filter for `profmgr`
-  locally — the `| include` pipe is not supported (the CLI expects an integer).
-- `cfgm`'s `FD=-1: read audit file ...` appears on **successful** transitions too. It carries no
-  diagnostic weight.
-- **`central_show_commands` with `device_type='gateways'` returns real device output** and is the
-  fallback when SSH is unavailable. Parse it by slicing between `'output': '` and the **last**
-  `', 'command'` — embedded quotes break a naive terminator search.
-- **SSH `mgmt-auth` is device-owned and NOT modelled in Central.** A site move can reset it to
-  `public-key`, after which no password will ever work (`show ssh` -> `Mgmt User Authentication
-  Method public-key`) and Central has no lever to change it back. Budget for console access.
-
-## 5i. Scoped GET on `wlan-ssids` ignores the scope parameters
-
-```
-GET /network-config/v1alpha1/wlan-ssids/<ssid>?object_type=LOCAL&scope_id=<id>&device_function=CAMPUS_AP
-```
-returns the **library** object regardless of the query parameters. It will hand you a
-plausible-looking "baseline" of a scoped override that is actually a different object — observed
-returning `WPA2_PERSONAL` for an override that was `WPA3_SAE`.
-
-Use `central_get_wlan_profiles(view_type='LOCAL', scope_id=..., device_function=...)` to read a
-scoped override.
-
-## 5j. A site move silently orphans site-LOCAL WLAN overrides
-
-When APs move to a different site, any site-**LOCAL** WLAN override at the old site stops
-applying — the AP falls back to the site-collection (or library) definition. Nothing warns you,
-and Central still displays the override.
-
-Signature: **Central says one security type, the air says another.** Confirm with a client scan
-(`nmcli dev wifi list`) rather than trusting the config model. Then either delete the orphaned
-override or recreate it at the scope that now serves the APs.
 
 ## 11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID
 
@@ -1084,93 +1125,6 @@ appear on 6 GHz. A 2.4/5-only test client cannot validate the band no matter wha
 
 Verify the transition half explicitly: the SSID should still scan as `WPA2 802.1X` and a legacy
 supplicant should still associate and authenticate.
-
-## 5k. The CANARY FIELD — how to tell "inert feature" from "never pushed"
-
-When a config-model write appears to do nothing on the device, there are two very different causes
-and they look identical: the object never reached the device (wrong scope, no delta, failed push),
-or it reached the device and the platform ignores that field.
-
-**Distinguish them by putting a second, independently observable field in the same object.**
-
-Worked example (2026-08-29). A scoped `local-management` (System Administration) profile was
-written at the gateway's scope to re-enable password SSH:
-```json
-{"mgmt-auth-public-key": false,
- "mgmt-auth-uname-pwd": true,
- "login-session-timeout": 22}      <- the canary
-```
-At the resulting Config ID, `UPDATE SUCCESSFUL`:
-```
-show running-config | include loginsession -> loginsession timeout 22    CANARY LANDED
-show running-config | include mgmt-auth    -> ssh mgmt-auth public-key
-                                              no ssh mgmt-auth username/password   UNCHANGED
-```
-The canary proves the object reached the device in that generation, so "wrong scope" and "failed
-push" are both excluded. The `mgmt-auth-*` fields are inert for MOBILITY_GW. Without the canary
-this is an ambiguous negative and you will go on rescoping and re-pushing for hours.
-
-Pick a canary that is **cheap, reversible, and visible in a `show` command** — a timeout, a
-description, a banner. Never a canary that changes forwarding or security posture.
-
-**Related trap in the same test:** the first attempt duplicated the default profile byte-for-byte.
-Config ID advanced and `UPDATE SUCCESSFUL` was reported, and nothing changed — because there was
-**no delta to push**. A Config ID that advances is not evidence your intent was applied. Always
-give the write a real difference, and prefer one you can see.
-
-## 5l. Gateway SSH `mgmt-auth`: the field write is inert, the CONFIG REBUILD is the fix
-
-**This section was wrong in its first revision and is corrected here.** It previously concluded
-"there is no Central-side lever, get console." Both halves were false. Keep the negative results,
-discard the remedy.
-
-### What is true (measured)
-
-- `mgmt-auth-public-key` / `mgmt-auth-uname-pwd` exist on the `local-management` object, validate,
-  push, and **do nothing** on a MOBILITY_GW. Proven with a canary (§5k).
-- The default profile carrying them (`default_GW_profile`, Mobility Gateway / Global) **cannot be
-  edited**, and reports both methods enabled while the device has password auth disabled.
-- The `ssh mgmt-auth` lines are absent from flash (`show configuration`) and absent from the Classic
-  local override, and they survive an AC power cycle.
-- SSH negotiates `publickey,keyboard-interactive`, so a password attempt looks like it should work
-  and returns `Permission denied`. Confirm with a real authentication attempt before theorising.
-
-### What is ALSO true, and is the actual fix
-
-A **Reset Config on the device's local override** (§3) clears it. The device rebuilds its
-device-owned config from Central and comes back with:
-
-    Mgmt User Authentication Method     username/password public-key
-
-Verified 2026-08-29 on a 9004 that had been locked out since a site move.
-
-### Why "get console" was wrong
-
-Vendor documentation is explicit that the gateway CLI cannot make this change either:
-
-> "The management user of Aruba Gateways have restricted to access and troubleshoot only the device
-> related issues through the device user interface. Any other tasks such as configuration,
-> management, or device upgrade for a Gateway can be performed only from the Aruba Central UI."
-
-A console session is the same restricted CLI as SSH. Console buys **nothing** here. Do not schedule
-console time for a `mgmt-auth` lockout.
-
-### How to reason about it next time
-
-The diagnostic question is not "which Central field sets `ssh mgmt-auth`" — no reachable field does.
-It is **"did this ever work on this device, and what changed?"** If Central's model already carries
-the value you want (it did: `mgmt-auth-uname-pwd: true` at every scope) then the model is right and
-the DEVICE has drifted. Drift between a correct model and a wrong device is repaired by rebuilding
-the device's config, not by writing the field again.
-
-The trigger event is almost always a **site move, group move, or cluster rebuild** — the same class
-of event that orphans site-LOCAL overrides (§5j).
-
-**But read §12 before you pull the trigger.** Reset Config wipes every device-scope object, and the
-recovery is bigger than it looks.
-
-
----
 
 ## 12. Reset Config on a gateway — the device-config rebuild runbook
 
@@ -1346,3 +1300,47 @@ pulling a config that re-stranded it. Note also that a plain `reload` does NOT r
 gateway to the factory DHCP posture — it retains the static config and stays stranded. Only
 `write erase all` produces a genuinely unprovisioned boot, and it IS accepted (unlike
 `configure terminal`).
+
+---
+
+## Provenance
+
+Built from a live AOS 10 gateway + tunnel-mode WLAN engagement (2026-08-27). Sections 5 and 9 restate
+universal Engineering Office gates at the point of use; the canonical statements live in the guardrails
+(`eo-guardrails`) and in the practice's LESSONS record. If they ever disagree, the canonical record wins —
+fix this file.
+
+**Revised 2026-08-27 (same day, second pass) after tunnel mode was PROVEN end to end.** Added §1b
+(the gateway-cluster / `overlay-wlan` binding), §9b (UI scope and field traps when recreating a WLAN), the
+`dtunnel` success evidence and the `aaa test-server` probe technique in §6.
+
+The first pass of this runbook was correct about §1 (loopback System IP) but silent on the second fault,
+and that gap cost a full session: with the loopback already fixed, a tunnel-mode WLAN that had NO gateway
+cluster bound presented as "the tunnel orchestrator does not work in this hybrid tenant" — which was
+written into an engagement DECISIONS.md as a platform limitation and went unchallenged for two days. It
+was not a platform limitation. §6 previously implied `show ap bss-table` was a valid gateway-side check;
+on the gateway it reads `Num APs: 0` even with a live tunnelled client, which is exactly the false signal
+that produced the wrong conclusion. That line is now corrected.
+
+Standing lesson this file exists to prevent: **if every documented prerequisite reads green and the
+product still does not work, suspect your own setup — not the product — and never commit "X cannot be
+done" to a design record without a named mechanism and an explicit re-test trigger.**
+
+**Third pass, same day — grounded in the vendor docs after the Human rejected trial-and-error findings.**
+§9b's shared-vs-local rule and §9c (guest captive portal) were originally derived by clicking through the
+UI. That produced the right answers twice and a WRONG answer once (an invented "AP-hosted portal" option,
+read out of an ambiguous doc sentence). All three are now sourced:
+
+- new-central `get-started/cfg-guides-ap-gw.htm` — tunnel WLANs must be Library profiles assigned to the
+  AP device group; Tunnel is mandatory for AP+Mobility Gateway deployments; Security Levels are
+  Enterprise / Personal / Open only.
+- aos10x `cfg/cfg-wlan-overlay.htm` — APs are authenticators, the gateway is an authentication proxy.
+- aos10x `cfg/aps/conf_guest_ssids.htm` — the only two splash page profiles are External and Cloud Guest.
+- aos10x `cfg/security/authentication/l3-cptv-prtl-conf.htm` — the gateway captive-portal profile is the
+  Branch Gateway path.
+
+**Do not report a capability question from UI presence or absence.** A drop-down tells you what this
+tenant exposes today; the doc tells you what the product does and why. Read §0 and go to the doc first.
+
+
+---
