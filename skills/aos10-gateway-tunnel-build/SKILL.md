@@ -38,8 +38,10 @@ create-only" was used on 2026-08-29 to advise AGAINST a cluster rebuild on the g
 tunnel-mode WLAN would have to be recreated. If that claim is wrong, the advice was wrong. It carries no
 evidence line. The lab has a 9004, Central and APs; these are re-testable non-destructively.
 
+
 ## CONTENTS
 
+- §CLAIM CONFIDENCE — read this before relying on any section
 - §0. Ground yourself in the RIGHT doc set — first, always
 - §0b. READ THIS FIRST — the Central configuration architecture
 - §1. The single most important fact
