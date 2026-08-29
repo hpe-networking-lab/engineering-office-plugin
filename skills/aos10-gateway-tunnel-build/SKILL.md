@@ -41,6 +41,8 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
@@ -49,7 +51,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §1. The single most important fact
 - §1b. The SECOND most important fact — a tunnel-mode WLAN needs a gateway-cluster BINDING
 - §1c. `cluster-scope-id` — use the SITE, and never edit the binding in place
-- §2. Build order (New Central) — prerequisites BEFORE anything destructive
+- §2. Build order (New Central) — prerequisites BEFORE anything destructive   `[proven]` (item 3 and 5 validated 2026-08-29)
 - §3. When Central "cannot" change the gateway's uplink or system IP
 - §3b. Carrying a tagged client VLAN out of the gateway uplink
 - §4. What is device-owned vs Central-managed   `[proven]` — validated live 2026-08-29
@@ -263,7 +265,7 @@ sees is a client failing to associate, not a flapping VAP.
 
 ---
 
-## 2. Build order (New Central) — prerequisites BEFORE anything destructive
+## 2. Build order (New Central) — prerequisites BEFORE anything destructive   `[proven]` (item 3 and 5 validated 2026-08-29)
 
 Per the onboarding doc, create these first. Skipping any of them can strand the gateway.
 
@@ -275,9 +277,18 @@ Per the onboarding doc, create these first. Skipping any of them can strand the 
 2. **Gateway System profile** — System IP VLAN = the VLAN above. **No loopback.**
 3. **Static Routing profile** — default gateway via **Device-Specific Parameters > Gateway/AOS-S
    Parameters > Default Gateways**. The generic *IP Routes* row does NOT render on a gateway.
+   **CONFIRMED live 2026-08-29** — the device-scope object is a `default-gateway` structure, not a route:
+
+       static-route/CoA-GW-DefaultRoute
+         default-gateway: [{dg-name: "1", forwarding-type: "NEXTHOP",
+                            ipv4-address: 192.168.86.1, metric: 1}]
 4. **DNS Server profile** — mandatory. Without a resolver the gateway cannot resolve the conductor FQDN.
-5. **User Administration profile** — carries `mgmt-user admin`. It lives in the auto-imported config and
-   is wiped by a reset.
+5. **User Administration profile** — carries `mgmt-user admin`.
+   > **CORRECTED 2026-08-29 `[proven]`.** This previously read "it lives in the auto-imported config and
+   > is wiped by a reset." **False.** `central_get_scope_tree` places `management-users/Gateway-Admin` at
+   > **GLOBAL**, under the MOBILITY_GW persona — not at device scope. A device Reset Config does NOT wipe
+   > it; it is re-pushed from global. Same for **DNS**, which lives at SITE (`dns/CoA-DNS`). Treating
+   > either as device-scope rebuild work sends you to restore objects that were never lost. See §4.
 
 Only then do anything that resets or re-syncs the device.
 
@@ -394,22 +405,46 @@ Other confirmed facts:
 - SSH still serves `show`. **`show running-config` over plain ssh returns EMPTY** (needs a pty) —
   never conclude a line is absent from an empty ssh result. See §5b.
 
-### 4a. INSTRUMENT WARNING — how to enumerate device scope, and how NOT to
+### 4a. INSTRUMENT WARNING — scoped GETs that return EMPTY on objects that exist   `[proven]`
 
-**Use `central_get_scope_tree`.** Walk to the DEVICE node and read its `resources` list.
+**Use `central_get_scope_tree` to enumerate what lives at a scope.** Walk to the node and read its
+`resources` list. It is the only enumerator that proved reliable (measured 2026-08-29).
 
-**Do NOT use these to decide what exists at a scope — both returned empty on a scope that demonstrably
-holds 9 objects (measured 2026-08-29):**
+**These returned EMPTY on scopes that demonstrably hold the object:**
 
-    central_get_config_assignments(scope_id=<device>)              -> {"config-assignment": []}
-    central_get_config_assignments(scope_id=<device>,
-                                   device_function="MOBILITY_GW")  -> {"config-assignment": []}
-    central_get_system_info(scope_id=<device>,
-                            device_function="MOBILITY_GW")         -> {}      <- object EXISTS
+| Call | Returned | Truth per scope tree |
+|---|---|---|
+| `central_get_config_assignments(scope_id=<device>)` | `{"config-assignment": []}` | 9 resources at that device scope |
+| `central_get_system_info(...)` — **all four shapes**: scope only; scope+device_function; scope+device_function+object_type=LOCAL; library | `{}` every time | `system-info/sys-system-info-profile` at the gateway device scope, plus `system-info/*` at 3 AP device scopes |
+| `central_get_gateway_clusters(scope_id=<site>, device_function=MOBILITY_GW)` | `{}` at BOTH sites | `gateway-clusters/CoA-POC-GW-cluster` at CoA-POC **and** CoA-Lab |
 
-The site scopes returned 16 and 30 assignments from the same tool with the same shape of call, so the
-tool works — it just does not enumerate DEVICE scope. **An empty result here is a claim about the
-instrument, not about the device.** Corroborate from the scope tree before concluding absence.
+The same `config_assignments` call returned **16** and **30** rows at site scopes, so the tool works —
+it does not enumerate DEVICE scope. **An empty result from these is a claim about the instrument, not
+about the device.** Corroborate against the scope tree before ever concluding absence.
+
+> **This cost a real decision.** On 2026-08-29 an approved single-field gateway rename was ABANDONED on
+> the conclusion "there is no system-info object at the gateway device scope, so this is a create on an
+> unverified assumption." The object was there all along. The stop was correct given the evidence in
+> hand, and the evidence was an artifact.
+
+### 4b. Renaming a gateway — the hostname lives in the System Information profile   `[doc-grounded]`
+
+Per the vendor workflow *Rename Hostnames*
+(https://developer.arubanetworks.com/new-central/docs/rename-hostnames):
+
+> "device hostnames are either created or updated determined by their current **System Information
+> profile** status. Only the default System Information profile will be updated. In the case where there
+> are no current profiles, one will be created with the default profile name of
+> **`sys-system-info-profile`**"
+
+The workflow is keyed on **serial numbers**, not device type — it is not AP-only, despite the
+`central_manage_system_info` tool description saying "Access Points". The gateway's device scope carries
+exactly that default profile name.
+
+**Practical caution:** because `central_get_system_info` reads empty (§4a), you cannot capture a baseline
+of the profile through it, and you cannot read the write back through it. Verify the result on
+`central_get_devices(serial_number=...)` `.name` and on the scope tree instead — and do not treat an
+inability to read the object as permission to write it blind.
 
 ## 5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
 
