@@ -46,6 +46,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
@@ -458,6 +459,15 @@ Per the vendor workflow *Rename Hostnames*
 The workflow is keyed on **serial numbers**, not device type — it is not AP-only, despite the
 `central_manage_system_info` tool description saying "Access Points". The gateway's device scope carries
 exactly that default profile name.
+
+**Vendor UI path, verbatim (step 7.6 of onboard-gws.htm):**
+
+> "Under **Devices** scope, select the gateway and then navigate to **System** > **System Information**.
+> In the System Information list, select the System Information profile and **edit the hostname** and
+> other required parameters."
+
+And the auto-import sample table lists `System Information | hostname 7210-GW2`, confirming the field
+lives there for GATEWAYS, not only APs.
 
 **Practical caution:** because `central_get_system_info` reads empty (§4a), you cannot capture a baseline
 of the profile through it, and you cannot read the write back through it. Verify the result on
