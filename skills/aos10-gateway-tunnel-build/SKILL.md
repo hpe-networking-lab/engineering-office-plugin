@@ -39,6 +39,7 @@ tunnel-mode WLAN would have to be recreated. If that claim is wrong, the advice 
 evidence line. The lab has a 9004, Central and APs; these are re-testable non-destructively.
 
 
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
@@ -66,7 +67,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §5m. PATCH merges, PUT replaces — the "merge-only API" rule is only half true
 - §6. Verification signature of a HEALTHY tunnel
 - §7. Cluster facts worth knowing before you touch one
-- §8. Create-only fields
+- §8. Create-only fields   `[observed-once]` — CONTESTED, see the schema note
 - §9. Working with an inherited handoff
 - §9b. Recreating a WLAN in the UI — scope and field traps
 - §9c. Guest captive portal — what AOS 10 does and does not offer
@@ -1024,15 +1025,29 @@ investigation on the strength of one cold packet.
 
 ---
 
-## 8. Create-only fields
+## 8. Create-only fields   `[observed-once]` — CONTESTED, see the schema note
 
-**Traffic Forwarding Mode (Bridge/Tunnel/Mixed) and Primary Gateway Cluster are editable ONLY in the
-Create WLAN flow.** On an existing WLAN they are disabled at every scope. You cannot convert a bridge
-SSID to tunnel — you must recreate it. Budget for that before proposing a cluster change.
+**Claim (2026-08-28, UI observation):** Traffic Forwarding Mode (Bridge/Tunnel/Mixed) and Primary
+Gateway Cluster are editable ONLY in the Create WLAN flow. On an existing WLAN they appear disabled at
+every scope.
 
-Capture the full existing WLAN profile JSON before deleting anything.
-
----
+> **⚠ CONTESTED by the API schema (checked read-only, 2026-08-29).** `central_manage_wlan_profile`
+> exposes `forward-mode` (`FORWARD_MODE_BRIDGE` / `FORWARD_MODE_L2`) as an ordinary payload field with
+> PATCH-merge update semantics, and `central_manage_overlay_wlan` — which carries the gateway-cluster
+> binding — accepts `action_type: 'update'`. **Neither is marked create-only in the schema.**
+>
+> This does NOT prove the claim false: create-only enforcement is frequently server-side and invisible
+> to a schema. What it proves is that the claim was generalised from **the UI** to **the platform**, and
+> the sentence "you cannot convert a bridge SSID to tunnel" is not supported by anything we have tested.
+>
+> **Consequence to be honest about:** on 2026-08-29 this section was used to advise AGAINST a gateway
+> cluster change, on the grounds that every tunnel-mode WLAN would have to be deleted and recreated. If
+> the API path works, that cost estimate was too high. The advice not to rebuild was still correct — the
+> hypothesis behind it was independently falsified — but the reasoning leaned on an unverified claim.
+>
+> **Non-destructive way to settle it, in the LAB only:** create a scratch WLAN, PATCH its `forward-mode`,
+> read back the stored profile, then delete the scratch object. No customer tenant, no production SSID,
+> full revert. Until someone does that, treat this section as a UI observation and nothing more.
 
 ## 9. Working with an inherited handoff
 
