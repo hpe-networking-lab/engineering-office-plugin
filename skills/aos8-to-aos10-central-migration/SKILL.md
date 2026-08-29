@@ -12,21 +12,22 @@ description: Migrate controller-managed ArubaOS 8 campus APs to AOS 10 under HPE
 
 # AOS 8 → AOS 10 campus AP migration (New Central)
 
+
 ## CONTENTS
 
-- §FIRST: run the vendor's assessment skill, not this one
-- §0. Two rules that prevent most of the pain
-- §1. Establish cluster type BEFORE planning anything
-- §2. The prerequisite chain — verify each link LIVE
+- §FIRST: run the vendor's assessment skill, not this one   `[proven]`
+- §0. Two rules that prevent most of the pain   `[proven]`
+- §1. Establish cluster type BEFORE planning anything   `[observed-once]` — one tenant, verify in yours
+- §2. The prerequisite chain — verify each link LIVE   `[proven]`
 - §3. Create the group the RIGHT way, or config will never deploy
 - §4. The conversion itself (controller-side)
 - §5. After conversion — the three things that leave an AP silent
-- §6. The scope model — where config actually lives
-- §7. RADIUS / 802.1X
-- §8. What the connector can and cannot do (hybrid tenant)
+- §6. The scope model — where config actually lives   `[doc-grounded]`
+- §7. RADIUS / 802.1X   `[proven]`
+- §8. What the connector can and cannot do (hybrid tenant)   `[proven]`
 - §9. Verification — the green signature
-- §10. Deployment mode: standalone vs hybrid
-- §11. Order of operations (the short version)
+- §10. Deployment mode: standalone vs hybrid   `[observed-once]`
+- §11. Order of operations (the short version)   `[proven]`
 - §Provenance
 
 ---
@@ -40,7 +41,11 @@ cluster and tunnel-anchoring work is a *different* problem — use `aos10-gatewa
 
 ---
 
-## FIRST: run the vendor's assessment skill, not this one
+## FIRST: run the vendor's assessment skill, not this one   `[proven]`
+
+> Verified 2026-08-29: `skills_list(platform='central')` on the connector returns **15** skills including
+> `aos-migration` — *"AOS 8 → AOS 10 migration (PoC) — readiness + config translation plan"*. The shelf is
+> real; load it before improvising.
 
 If the `hpe-networking` MCP connector is available, call `skills_list` → `skills_load('aos-migration')`
 **before** anything here. That bundled skill is the ASSESSMENT AND PLANNING half and is far more thorough
@@ -59,7 +64,7 @@ maintained by the connector authors and improves without us.
 
 ---
 
-## 0. Two rules that prevent most of the pain
+## 0. Two rules that prevent most of the pain   `[proven]`
 
 > **Use the connector's bundled `aos-migration` runbook as the primary instrument** (`skills_list` →
 > `skills_load`). It is VSG-anchored and produces the per-object disposition matrix and Central API call
@@ -97,7 +102,7 @@ workflow performs.)
 
 ---
 
-## 1. Establish cluster type BEFORE planning anything
+## 1. Establish cluster type BEFORE planning anything   `[observed-once]` — one tenant, verify in yours
 
 Everything downstream forks on this. If the tenant shows a **"Classic Central" toggle**, it is a
 **hybrid** cluster (Classic + New Central coexisting). New Central today *is* the hybrid model — there is
@@ -117,7 +122,7 @@ device-move was.
 
 ---
 
-## 2. The prerequisite chain — verify each link LIVE
+## 2. The prerequisite chain — verify each link LIVE   `[proven]`
 
 A handoff saying "the AP is onboarded, just set persona / move the group" is a claim, not a fact. Verify
 the whole chain from the top; the real blocker is usually further upstream than the handoff claims.
@@ -251,7 +256,13 @@ failures persisted after upgrading the AP.
 
 ---
 
-## 6. The scope model — where config actually lives
+## 6. The scope model — where config actually lives   `[doc-grounded]`
+
+Confirmed verbatim against the vendor hierarchy page 2026-08-29
+(https://developer.arubanetworks.com/new-central/docs/new-central-hierarchy): *"Library… Global… Site
+Collection… Site… Device"*, and *"Device Groups are an optional parameter in Central that cuts across the
+entire hierarchy… devices can only belong to one group."* Device-level config has the HIGHEST precedence;
+Global the lowest.
 
 Hierarchy: **Library > Global > Site Collection > Site > Device**, and a device inherits from every level
 above. **Device Groups are a separate optional construct that cuts across the hierarchy and apply
@@ -283,7 +294,7 @@ a scope-local object but **Unassign** for a shared one; the connector's remove a
 
 ---
 
-## 7. RADIUS / 802.1X
+## 7. RADIUS / 802.1X   `[proven]`
 
 - **The auth-server shared secret is not in the config-model API.** The `auth-server` object's full field
   set contains no `shared-secret` / `key` / `secret`. Build everything else by API (address, ports,
@@ -305,8 +316,15 @@ a scope-local object but **Unassign** for a shared one; the connector's remove a
 
 ---
 
-## 8. What the connector can and cannot do (hybrid tenant)
+## 8. What the connector can and cannot do (hybrid tenant)   `[proven]`
 
+- **THREE READS RETURN EMPTY ON OBJECTS THAT EXIST** (measured 2026-08-29, corroborated against
+  `central_get_scope_tree`): `central_get_system_info` (all four documented parameter shapes),
+  `central_get_config_assignments(scope_id=<device>)`, and
+  `central_get_gateway_clusters(scope_id=<site>)`. Use the scope tree to enumerate; an empty result from
+  these three is a claim about the instrument. This cost an abandoned change on 2026-08-29.
+- **`central_show_commands` `device_type` enum is lowercase plural**: `aos-s | aps | cx | gateways`.
+  `GATEWAY` / `MOBILITY_GW` return 422 and look like an unreachable device.
 - **Config-model writes work:** WLAN profiles, auth-servers, server-groups, VLANs, roles, config-assignments.
 - **Membership writes are blocked:** device-groups-add-devices, device-collection-add-devices, site
   device-assign.
@@ -341,7 +359,7 @@ lags too; trust the monitoring total plus SYNCHRONIZED.
 
 ---
 
-## 10. Deployment mode: standalone vs hybrid
+## 10. Deployment mode: standalone vs hybrid   `[observed-once]`
 
 Separate the axes: **standalone vs hybrid = management plane**; **Foundation vs Advanced = feature
 license**. Do not choose on onboarding friction alone.
@@ -364,7 +382,7 @@ over-grade, and license tier plus migration effort are exactly what decides the 
 
 ---
 
-## 11. Order of operations (the short version)
+## 11. Order of operations (the short version)   `[proven]`
 
 1. Determine cluster type; read the VSG and migration docs.
 2. Claim device in GreenLake + attach a **valid** subscription. Verify entitlement, not availability.

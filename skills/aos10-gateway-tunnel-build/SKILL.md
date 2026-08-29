@@ -48,11 +48,12 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
 ## CONTENTS
 
 - §CLAIM CONFIDENCE — read this before relying on any section
 - §0. Ground yourself in the RIGHT doc set — first, always   `[doc-grounded]`
-- §0b. READ THIS FIRST — the Central configuration architecture
+- §0b. READ THIS FIRST — the Central configuration architecture   `[doc-grounded]`
 - §1. The single most important fact
 - §1b. The SECOND most important fact — a tunnel-mode WLAN needs a gateway-cluster BINDING
 - §1c. `cluster-scope-id` — use the SITE, and never edit the binding in place
@@ -64,12 +65,12 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §5b. HOW to actually read an ACP-locked gateway — the mechanics S5 assumes
 - §5c. Before diagnosing a tunnel WLAN, confirm a client is actually associated
 - §5d. Additional client VLANs on a shared AP↔gateway tunnel — what is established, and what is NOT
-- §5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect
+- §5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect   `[proven]`
 - §5f. Reading a client's VLAN and forcing a clean role re-test
 - §5g. A role only renders on the device if something REFERENCES it
 - §5h. Instruments: what to trust on an AOS 10 gateway   `[proven]` — measured 2026-08-29
 - §5i. Scoped GET on `wlan-ssids` ignores the scope parameters
-- §5j. A site move silently orphans site-LOCAL WLAN overrides
+- §5j. A site move silently orphans site-LOCAL WLAN overrides   `[proven]`
 - §5k. The CANARY FIELD — how to tell "inert feature" from "never pushed"
 - §5l. Gateway SSH `mgmt-auth`: the field write is inert, the CONFIG REBUILD is the fix
 - §5m. PATCH merges, PUT replaces — the "merge-only API" rule is only half true
@@ -112,11 +113,13 @@ hours.
 
 ---
 
-## 0b. READ THIS FIRST — the Central configuration architecture
+## 0b. READ THIS FIRST — the Central configuration architecture   `[doc-grounded]`
 
 Before touching any Central object, hold the model:
 **`/lab/github/lab-documentation/reference/central-configuration-architecture.md`** — read and
 follow it. It is derived from vendor documentation and the live scope tree, not from incidents.
+Scope model confirmed against the vendor hierarchy page 2026-08-29:
+https://developer.arubanetworks.com/new-central/docs/new-central-hierarchy
 
 The three facts this runbook assumes you already know:
 
@@ -746,7 +749,7 @@ VLAN's IP address, the role ACL, and a full WLAN rebuild.
 **`gre0` showing a single VLAN is not the limit** — it still reads `VLANs 1` while a dedicated client
 VLAN forwards correctly. Treat it as a symptom, never a constraint.
 
-## 5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect
+## 5e. A persistent CONFIG FAILURE may be a STUCK STATE, not a config defect   `[proven]`
 
 **Established 2026-08-28 by direct test.** A 9004 sat in `CONFIG FAILURE` across seventeen
 consecutive generations (CFGID-131 through 147), every one rejected on the same spurious
@@ -905,11 +908,15 @@ returning `WPA2_PERSONAL` for an override that was `WPA3_SAE`.
 Use `central_get_wlan_profiles(view_type='LOCAL', scope_id=..., device_function=...)` to read a
 scoped override.
 
-## 5j. A site move silently orphans site-LOCAL WLAN overrides
+## 5j. A site move silently orphans site-LOCAL WLAN overrides   `[proven]`
 
 When APs move to a different site, any site-**LOCAL** WLAN override at the old site stops
 applying — the AP falls back to the site-collection (or library) definition. Nothing warns you,
 and Central still displays the override.
+
+**Classify the override with `metadata.count_objects_in_module.LOCAL` (§5p) — NOT by diffing against
+the parent.** A 2026-08-29 sweep "found" orphaned overrides at a site that had none: the scoped read
+returned inherited objects and they looked local.
 
 Signature: **Central says one security type, the air says another.** Confirm with a client scan
 (`nmcli dev wifi list`) rather than trusting the config model. Then either delete the orphaned
