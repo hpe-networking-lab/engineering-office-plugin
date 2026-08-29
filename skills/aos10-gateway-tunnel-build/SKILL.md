@@ -305,6 +305,60 @@ The API validates server-side, so a wrong field name is rejected without reachin
   (it needs a pty) — use the Central show-command API. Never conclude a config line is absent from an
   empty ssh result.
 
+
+### 4b. Device-scope CAPTURE and REBUILD — run this around ANY regenerating action
+
+§4 says *what* is device-owned. This says what to DO about it. The facts in §2/§4 were present and
+correct while the same gateway was rebuilt six times in three days, each rebuild missing a different
+row — because a description is not a checklist.
+
+**These are all the SAME event. Treat them identically:**
+Classic "Reset config" / local-override reset · site move between Central sites · reload or cold boot ·
+Central re-push of a device-scope profile.
+
+Flash on an ACP gateway is **factory-default** — the device persists nothing. Each of these wipes the
+whole device-scope layer at once.
+
+**Before the action — CAPTURE every row into the engagement record:**
+
+| # | Row | Capture with |
+|---|---|---|
+| 1 | Uplink port VLAN assignment (untagged + tagged) | `show vlan` |
+| 2 | Each VLAN's static IP | `show ip interface brief` |
+| 3 | System IP (which VLAN interface) | `show controller-ip` |
+| 4 | Default route | `show ip route` |
+| 5 | DNS resolvers | running config / `show ip domain-name` |
+| 6 | Cluster membership + self address | `show lc-cluster group-membership` |
+| 7 | management-users | `show mgmt-user` |
+| 8 | SSH mgmt-auth methods | `show ssh` |
+| 9 | Which VLANs are bridged-only (NO L3 here) | `show ip interface brief` — record the ABSENCE |
+| 10 | Every `overlay-wlan` `cluster-scope-id` | per-WLAN read |
+
+**A prerequisite check is worthless if your action is what removes it.** Verifying rows 1–8 are present
+and then running Reset Config proves nothing — those rows ARE device scope and the action deletes them.
+Classify each item by WHERE IT LIVES first; anything at the scope being wiped is not a prerequisite, it
+is rebuild work. Budget it and say plainly what will be destroyed.
+
+**After the action — REBUILD in this order. The order is load-bearing:**
+
+1. **Uplink port first.** Before any VLAN static IP. If the port comes back on a DHCP VLAN it leases the
+   address the static VLAN is configured to take, and the static commit then fails with no obvious cause.
+2. VLAN static IP → 3. Gateway System profile (System IP VLAN, never a loopback) → 4. Default route
+   (Gateway/AOS-S Parameters, per §2) → 5. DNS → 6. Cluster member — **include the `ip` field**, a member
+   without it reads back as a valid object while the device renders `controller-ip 0.0.0.0` and reports
+   `Cluster Disabled` → 7. management-users / SSH → 8. re-point every `overlay-wlan cluster-scope-id`.
+
+**Verify the management path before ANY feature check.** `show ip route` has a default, and
+`show lc-cluster group-membership` says *Cluster Enabled* with a real self address. Until both are true,
+nothing you observe about WLANs, roles or tunnels means anything.
+
+**Record the ABSENCES too (row 9).** A missing element is not evidence it belongs there. Do not add
+configuration to explain an absence — ground it in the authoritative source first. On a gateway that
+only bridges a client VLAN, adding an L3 interface there is a fault you are introducing, not repairing.
+
+Engagement-specific values (addresses, port numbers, cluster names) belong in a device-scope manifest in
+the **engagement** record — never in this skill.
+
 ---
 
 ## 5. VERIFY EVERY WRITE ON THE DEVICE — an API 200 is not proof
