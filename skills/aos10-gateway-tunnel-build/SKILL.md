@@ -11,6 +11,7 @@ description: Build, change, or troubleshoot an HPE Aruba AOS 10 Mobility Gateway
 
 # AOS 10 Mobility Gateway + tunnel-mode WLAN — build and verify
 
+
 ## CONTENTS
 
 - §0. Ground yourself in the RIGHT doc set — first, always
@@ -1153,6 +1154,52 @@ Read the scope column, not just the value:
     central_get_config_assignments(scope_id=<device scope>)   -> everything here DIES
     Config > Devices > <gateway> > ... "Inherits From: Self"   -> device scope, DIES
     "Inherits From: Global / Site"                            -> survives
+
+### 12a-bis. THE COST NOT IN THE DIALOG — device certificates are not config
+
+**Weigh this BEFORE choosing Reset Config, because no rebuild order can undo it.**
+
+A factory erase regenerates the gateway's **field certificates**. Certificates are not config: they
+are not in your fingerprint, not in Central's model, not in any device-scope manifest, and not
+restorable by re-pushing. The capture list in §12b cannot save them.
+
+Observed downstream (9004, 2026-08-29), all from one erase:
+
+    cpsec: check_local_cert -> Invalid cluster role: 1
+    cpsec: Checking local field certificates failed
+    sys_central_nac   Raw Rq 3 / Rej 3        <- Central NAC rejects the gateway's RADSec RADIUS
+    rfc-3576 packets received: 0              <- therefore no CoA is ever sent
+    captive portal -> "Login error"
+
+Everything else can be verified healthy at the same time — device scope matching every manifest row,
+a client anchored `Forward mode: dtunnel`, DHCP and DNS correct — and the portal still fails. The
+guest path is broken at a layer the config model does not reach.
+
+**Config-side levers, all confirmed exhausted for this fault:**
+
+| Lever | Result |
+|---|---|
+| Full config resync | no change |
+| Reload (x3) | no change |
+| Auto-cluster | API refuses; manual is the documented mode |
+| Re-provision persona / group | verified already correct |
+| Detach + re-attach the NAC binding | Central refuses the delete (see below) |
+
+> **Gate: if the gateway participates in Central NAC / RADSec, treat Reset Config as certificate-
+> affecting, not merely config-affecting.** Decide whether you are willing to re-establish device
+> certificate trust before you click it. If a cheaper lever exists for the original symptom, take it.
+
+### 12a-ter. A Central NAC captive-portal binding cannot be detached by setting Captive Portal Type = None
+
+The `sys_cnac_*` profile is **system-generated**. Central cannot delete it while the WLAN still
+references it; the update fails and writes nothing:
+
+    Delete for unexpected req_xpath="/aruba-aaa-captive-portal:captive-portal/profile[name='<sys_cnac_profile>']"
+
+The "Exit Profile — you have unsaved data" dialog is the tell that nothing was written; verify both
+scopes afterwards. Same family as "never delete a policy a role references" — create fans out,
+delete does not. Note also the UI warning on these profiles: *"This is a shared library profile. Any
+modification will impact all scope(s) it is assigned to."*
 
 ### 12b. Capture before you reset
 
