@@ -34,6 +34,28 @@ hours.
 
 ---
 
+## 0. READ THIS FIRST — the Central configuration architecture
+
+Before touching any Central object, hold the model:
+**`/lab/github/lab-documentation/reference/central-configuration-architecture.md`** — read and
+follow it. It is derived from vendor documentation and the live scope tree, not from incidents.
+
+The three facts this runbook assumes you already know:
+
+1. **Five scopes, each with its own configuration database** — Global, Site Collection, Site,
+   Device, Device Group. Reading one scope tells you nothing about the others.
+2. **THREE parallel pathways reach a device** — `Global > Site Collection > Site > Device`,
+   `Global > Site > Device`, and `Global > Device Groups > Device`. Device Group is *parallel* to
+   Site, not beneath it. A sweep of one path that finds nothing is NOT evidence of absence.
+3. **Onboarding, site/group assignment and movement, group creation and persona configuration are
+   Classic Central only** — they are not in New Central and not in the config API. A symptom
+   pointing at device identity, role, group membership or persona is not solvable in New Central.
+
+And use the **CLI Viewer (Early Access)** on the scope's configuration page to see what the objects
+actually render into, instead of inferring the render from device `show` output.
+
+---
+
 ## 1. The single most important fact
 
 **On an AOS 10 campus Mobility Gateway the System IP MUST be a VLAN interface — never a loopback.**
