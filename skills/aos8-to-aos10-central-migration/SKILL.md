@@ -34,12 +34,14 @@ do not silently read 23KB into context, and do not re-derive what is already wri
 
 
 
+
+
 ## CONTENTS
 
 - §RETRIEVE, DO NOT READ — this file is 23KB (~6,619 tokens)
 - §FIRST: run the vendor's assessment skill, not this one   `[proven]`
 - §0. Two rules that prevent most of the pain   `[proven]`
-- §1. Establish cluster type BEFORE planning anything   `[observed-once]` — one tenant, verify in yours
+- §1. Establish DEPLOYMENT MODE before planning anything   `[doc-grounded]` — corrected 2026-08-29
 - §2. The prerequisite chain — verify each link LIVE   `[proven]`
 - §3. Create the group the RIGHT way, or config will never deploy
 - §4. The conversion itself (controller-side)
@@ -48,7 +50,7 @@ do not silently read 23KB into context, and do not re-derive what is already wri
 - §7. RADIUS / 802.1X   `[proven]`
 - §8. What the connector can and cannot do (hybrid tenant)   `[proven]`
 - §9. Verification — the green signature
-- §10. Deployment mode: standalone vs hybrid   `[observed-once]`
+- §10. Deployment mode: standalone vs hybrid vs on-premises   `[doc-grounded]` — corrected 2026-08-29
 - §11. Order of operations (the short version)   `[proven]`
 - §Provenance
 
@@ -124,11 +126,38 @@ workflow performs.)
 
 ---
 
-## 1. Establish cluster type BEFORE planning anything   `[observed-once]` — one tenant, verify in yours
+## 1. Establish DEPLOYMENT MODE before planning anything   `[doc-grounded]` — corrected 2026-08-29
 
-Everything downstream forks on this. If the tenant shows a **"Classic Central" toggle**, it is a
-**hybrid** cluster (Classic + New Central coexisting). New Central today *is* the hybrid model — there is
-no Classic-free New Central yet.
+**There are THREE documented deployment modes, not one.** An earlier version of this section said
+"New Central today *is* the hybrid model — there is no Classic-free New Central yet." **That is
+false**, and it mattered: it implied every tenant needs the Classic-API fallback machinery below.
+
+Source, verbatim —
+[Deployment Modes in HPE Aruba Networking Central](https://arubanetworking.hpe.com/techdocs/CNX-CNXOP-NewHelp/HPE%20Aruba%20Networking%20Central/GUID-B0D6E537-6A53-4BBB-9EEF-ADB1C20AEB7C.html):
+
+> **On-Premises** — "installed and operated within the data center of an organization… preferred by
+> users who want to keep their data local due to internal policies, data privacy concerns,
+> regulatory compliance, or security requirements." *NOTE: a standalone (single-node) setup is NOT
+> supported in On-Premises deployments.*
+>
+> **Standalone** — "a fully self-contained and dedicated environment that supports **all features
+> natively without switching back to the HPE Classic Central interface**. This mode typically refers
+> to a single-user cluster where all functionalities are migrated to HPE Aruba Networking Central."
+>
+> **Hybrid** — "a mixed cluster setup where most of the functionalities are available in HPE Aruba
+> Networking Central, but certain operations still require switching to the HPE Classic Central
+> interface… used during the transition period."
+
+**So: everything in this skill about Classic API fallbacks applies to HYBRID tenants ONLY.** On a
+standalone tenant there is no Classic interface to fall back to and none of it is needed. Establish
+which mode the customer is in **before** planning anything, and do not assume hybrid because our own
+lab tenant is.
+
+> **Retrieval note:** that page is CLIENT-RENDERED. A plain HTTP fetch returns an empty body — it took
+> a JavaScript-capable browser to read it. An empty fetch here is a rendering artifact, not evidence
+> that the vendor is silent. This is exactly why the claim survived unchallenged.
+
+**The hybrid tell:** the tenant shows a "Classic Central" toggle.
 
 | Operation | Pure New Central | Hybrid |
 |---|---|---|
@@ -381,10 +410,15 @@ lags too; trust the monitoring total plus SYNCHRONIZED.
 
 ---
 
-## 10. Deployment mode: standalone vs hybrid   `[observed-once]`
+## 10. Deployment mode: standalone vs hybrid vs on-premises   `[doc-grounded]` — corrected 2026-08-29
 
-Separate the axes: **standalone vs hybrid = management plane**; **Foundation vs Advanced = feature
+Separate the axes: **deployment mode = management plane**; **Foundation vs Advanced = feature
 license**. Do not choose on onboarding friction alone.
+
+**There are three modes, not two** (see §1 for the vendor definitions verbatim). On-Premises is a
+real option for customers with data-residency, regulatory or privacy constraints — worth raising in
+K-12 and public-sector conversations rather than assuming cloud. Note its constraint: **a standalone
+single-node setup is not supported on-premises.**
 
 If the customer's adoption gate is a set of monitoring/ops views (the AirWave-parity case — RAPIDS,
 Clarity / client connectivity, Reports, Floorplans), weigh feature **maturity**: those views are mature in
