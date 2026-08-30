@@ -70,6 +70,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
 ## CONTENTS
 
 - §RETRIEVE, DO NOT READ — this file is 94KB (~26,244 tokens)
@@ -1166,6 +1167,28 @@ Measured on a live single-node 9004 via `central_show_commands(device_type="gate
   deviation out. **Note:** `auto-cluster` cannot be enabled on a manually-created cluster
   (`HTTP 400 validation failed`), so the choice is made at creation.
 
+### 7b. Forwarding mode — which to pick, in the vendor's own words   `[doc-grounded]`
+
+From the same page, verbatim:
+
+> "You must select **Tunnel** for AP and Mobility Gateway deployments. The **Bridge** option is for
+> AP-only deployments. The **Mixed** option is for AP and Mobility Gateway, but allows some VLAN to
+> be trunked to the switching fabric based on user session VLAN assignment. However, other user
+> sessions are tunneled to the Mobility Gateway cluster."
+
+So Mixed is not "a bit of both by accident" — it is a deliberate per-user-session split, chosen by
+VLAN assignment. If a design needs some sessions local and others tunnelled, Mixed is the documented
+answer rather than two SSIDs.
+
+### 7c. APs need NOT share the cluster's device group   `[doc-grounded]`
+
+> "The device group contains the APs intended to connect to this cluster for the specified ESSID.
+> However, **it is not mandatory for the APs to be in the same device group as the cluster; they may
+> belong to a different group.**"
+
+Worth knowing before anyone reorganises device groups to "fix" an anchoring problem — group
+membership is not the binding, the WLAN's cluster reference is.
+
 ## 8. Create-only fields   `[observed-once]` — CONTESTED, see the schema note
 
 **Claim (2026-08-28, UI observation):** Traffic Forwarding Mode (Bridge/Tunnel/Mixed) and Primary
@@ -1186,6 +1209,18 @@ every scope.
 > the API path works, that cost estimate was too high. The advice not to rebuild was still correct — the
 > hypothesis behind it was independently falsified — but the reasoning leaned on an unverified claim.
 >
+> **SECOND vendor-doc check (2026-08-29) — ALSO INCONCLUSIVE.** Checked the authoritative
+> configuration page,
+> [AOS-10 APs and Mobility Gateways Configuration](https://arubanetworking.hpe.com/techdocs/hpe-central/content/GUID-FAF2269D-7777-45ED-908F-9E4C430A74E6.html).
+> It documents Traffic Forwarding Mode and Primary Gateway Cluster as **Create Profile** parameters
+> and never states they are immutable afterwards. **Two vendor documents now describe only the
+> create path and neither says conversion is forbidden.** That is consistent with the claim and
+> still is not proof of it.
+>
+> **Conclusion after two doc checks: this claim cannot be settled from documentation.** It is a UI
+> observation, and only a test on a writable tenant can close it. Stop looking for a doc that says
+> it — that search has now been run twice and is not the constraint.
+
 > **Vendor-doc check (2026-08-29) — INCONCLUSIVE, recorded as such.** The vendor workflow
 > *Configure Tunneled SSID* (developer.arubanetworks.com/new-central/docs/configure-tunneled-ssid-workflow)
 > only ever **creates** — "Creates SSID profiles with associated roles… creates overlay WLAN profiles".
