@@ -11,8 +11,30 @@ description: The Engineering Office Standard engineering guardrails. Load and fo
 
 # Engineering Office Standard — Engineering Guardrails
 
+## RETRIEVE, DO NOT READ — this file is 13KB (~3,645 tokens)
+
+**Reading it whole is the expensive path and it is rarely the right one.** It is indexed in the
+lab corpus, section by section, each chunk carrying its confidence label. Pull only what you need:
+
+```
+lab_search("<your symptom or question>", effort="eo-guardrails")
+```
+
+That returns the matching section VERBATIM with its `CONFIDENCE` — `doc-grounded` / `proven` /
+`observed-once` / `unvalidated` — so you learn how well the answer is evidenced at the same time
+you learn the answer. Two retrieved sections cost roughly a tenth of this file.
+
+Read the whole file only when you are about to CHANGE it, or when you genuinely need the full
+build order end to end. Use the CONTENTS below to jump; do not scroll.
+
+**If the docs-rag connector is not attached, say so and read the sections you need via CONTENTS —
+do not silently read 13KB into context, and do not re-derive what is already written here.**
+
+
+
 ## CONTENTS
 
+- §RETRIEVE, DO NOT READ — this file is 13KB (~3,645 tokens)
 - §The reflexes (apply on every task)
 - §Change & validation gates (when the task makes a change)
 - §Toolset awareness (before saying "can't" — and before building)

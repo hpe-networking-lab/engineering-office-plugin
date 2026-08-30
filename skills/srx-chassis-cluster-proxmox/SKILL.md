@@ -28,8 +28,30 @@ metadata:
 
 # SRX Chassis Cluster on Proxmox VE
 
+## RETRIEVE, DO NOT READ — this file is 16KB (~4,490 tokens)
+
+**Reading it whole is the expensive path and it is rarely the right one.** It is indexed in the
+lab corpus, section by section, each chunk carrying its confidence label. Pull only what you need:
+
+```
+lab_search("<your symptom or question>", effort="srx-chassis-cluster-proxmox")
+```
+
+That returns the matching section VERBATIM with its `CONFIDENCE` — `doc-grounded` / `proven` /
+`observed-once` / `unvalidated` — so you learn how well the answer is evidenced at the same time
+you learn the answer. Two retrieved sections cost roughly a tenth of this file.
+
+Read the whole file only when you are about to CHANGE it, or when you genuinely need the full
+build order end to end. Use the CONTENTS below to jump; do not scroll.
+
+**If the docs-rag connector is not attached, say so and read the sections you need via CONTENTS —
+do not silently read 16KB into context, and do not re-derive what is already written here.**
+
+
+
 ## CONTENTS
 
+- §RETRIEVE, DO NOT READ — this file is 16KB (~4,490 tokens)
 - §Overview
 - §Runtime intake
 - §Before you start
