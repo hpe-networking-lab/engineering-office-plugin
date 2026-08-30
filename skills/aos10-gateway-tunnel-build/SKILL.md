@@ -71,6 +71,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 
 
 
+
 ## CONTENTS
 
 - §RETRIEVE, DO NOT READ — this file is 94KB (~26,244 tokens)
@@ -104,7 +105,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §9b. Recreating a WLAN in the UI — scope and field traps   `[doc-grounded]`
 - §9c. Guest captive portal — what AOS 10 does and does not offer   `[doc-grounded]`
 - §10. Recovery   `[proven]`
-- §11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID
+- §11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID   `[doc-grounded]` — verified 2026-08-29
 - §12. Reset Config on a gateway — the device-config rebuild runbook
 - §13. The reachability set for an AOS 10 gateway
 - §Provenance
@@ -1342,38 +1343,66 @@ box, so make sure §2 is complete before you create that situation.
 ---
 
 
-## 11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID
+## 11. WPA3-Enterprise and 6 GHz on a tunnel-mode SSID   `[doc-grounded]` — verified 2026-08-29
+
+Source: [WPA3-Enterprise](https://arubanetworking.hpe.com/techdocs/aos/wifi-design-deploy/security/modes/wpa3-enterprise/),
+quotes verbatim.
 
 6 GHz forbids WPA2 and mandates PMF, so a `WPA2_ENTERPRISE` SSID cannot use the band at all.
 
 **Valid enterprise opmodes are only:**
 ```
-WPA3_ENTERPRISE_CCM_128     <- standard WPA3-Enterprise; the right default
-WPA3_ENTERPRISE_GCM_256     <- CNSA 192-bit; needs specific client support
+WPA3_ENTERPRISE_CCM_128     <- widest compatibility; the right default
+WPA3_ENTERPRISE_GCM_256     <- GCMP-256; transition mode NOT ALLOWED on this mode
 ```
 `WPA3_ENTERPRISE` and `WPA3_ENTERPRISE_TRANSITION` are **not** valid values. **Transition is a
-separate boolean, not an opmode.**
+separate boolean, not an opmode** — confirmed: the vendor treats it as a mode *configuration*, not a
+security mode.
 
-Working recipe (verified, no impact on existing WPA2 clients):
+Working recipe (verified in build, and now doc-confirmed):
 ```json
 "opmode": "WPA3_ENTERPRISE_CCM_128",
 "wpa3-transition-mode-enable": true,
-"mfp-capable": true,
-"mfp-required": false,
-"rf-band": "BAND_ALL"
 ```
 
-**`mfp-required` must stay false when using transition mode.** PMF-required globally locks out
-the WPA2-Enterprise clients that transition mode exists to serve on 2.4/5 GHz. The 6 GHz radio
-enforces PMF-required on its own regardless.
+### ⚠ VERSION FLOOR — the part this skill was missing
 
-`rf-band: BAND_ALL` is what includes 6 GHz (`24GHZ_5GHZ` is the common default). Confirm the
-radio profile contains `RADIO_6G`, and remember that **only Wi-Fi 6E/7 hardware has a 6 GHz
-radio** — AP-5xx/AP-3xx (Wi-Fi 6) do not, so an SSID can be perfectly configured and still never
-appear on 6 GHz. A 2.4/5-only test client cannot validate the band no matter what the AP does.
+> "Transition mode is supported starting in **AOS 8.11 and 10.5** … Note that **AOS 8.10 and 10.4
+> behavior is different where WPA3-Enterprise clients will always negotiate connectivity using WPA2**
+> in 2.4 and 5 GHz operation."
+>
+> On 8.10/10.4: "Transition mode configuration **has no effect** on operation … AKM:5 is **not
+> advertised** with CCM 128."
 
-Verify the transition half explicitly: the SSID should still scan as `WPA2 802.1X` and a legacy
-supplicant should still associate and authenticate.
+**Below 10.5 the recipe above silently does nothing.** The config commits, the SSID broadcasts, every
+client connects — as WPA2. Nothing errors, so this reads as success. **Check the AP firmware before
+claiming a WPA3 result.** This matters here specifically: converted AOS 10 APs have been seen landing
+on **10.4.0.3**, which is below the floor.
+
+### Transition mode and 6 GHz are NOT mutually exclusive — a correction
+
+An earlier gate said they were. They are not; the interaction is subtler and better:
+
+> "When operating in the 6 GHz band, WPA3-Enterprise CCM 128 is **automatically set as
+> 'WPA3-Enterprise only mode'**" — AKM:5 only, PMF mandatory.
+
+So one SSID with `rf-band BAND_ALL` and transition enabled behaves correctly on every band: WPA2 and
+WPA3 clients share 2.4/5 GHz, while 6 GHz silently enforces WPA3-only. You do **not** need a second
+SSID for 6 GHz. Transition is not rejected on 6 GHz — it is **overruled**, per band, by design.
+
+### Vendor best practice worth passing on
+
+- "Consider **disabling** transition mode to limit attack vectors" — with PMF optional, management
+  frames can be spoofed for DoS or attacker-in-the-middle. Transition is a migration aid, not a
+  destination.
+- "Consider deploying WPA3-Enterprise and WPA2-Enterprise on **different individual VAPs**."
+- Disable weak EAP (PEAP-MSCHAPv2, CHAPv1, PAP); prefer EAP-TLS.
+
+### If a site later adds 6 GHz hardware, the documented order is
+
+1. Upgrade first — AOS 8: 8.11.2.1+; AOS 10: **10.5+**.
+2. Change security mode to CCM 128 and **disable** transition mode.
+3. Only then enable the 6 GHz band on the WLAN.
 
 ## 12. Reset Config on a gateway — the device-config rebuild runbook
 
