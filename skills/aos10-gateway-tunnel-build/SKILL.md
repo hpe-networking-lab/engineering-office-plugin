@@ -908,7 +908,7 @@ platform implements it for that device function.* Always confirm on the device.
 | Question | Trust | Do NOT trust |
 |---|---|---|
 | What config objects exist at a scope? | `central_get_scope_tree` — walk to the node, read `resources` | `central_get_config_assignments(scope_id=<device>)` → `[]`; `central_get_system_info` → `{}`; `central_get_gateway_clusters(scope_id=<site>)` → `{}`. All three empty on objects that exist (§4a) |
-| Is an object LOCAL to this scope or inherited? | `metadata.count_objects_in_module.LOCAL`; a divergent vault handle or field value (inheritance cannot diverge) | a scoped GET returning the object, or a zero diff against the parent — scoped GETs return the EFFECTIVE view (§5p) |
+| Is an object LOCAL to this scope or inherited? | `central_get_effective_config(scope_id=…)` → `instances[].origin_scope_name`: **two origins = LOCAL override, one = inherited**; or a divergent vault handle / field value (inheritance cannot diverge) | `metadata.count_objects_in_module.LOCAL` — **reported LOCAL 0 with two local objects present, 2026-08-29**; a scoped GET returning the object; a zero diff against the parent (§5p) |
 | Did my write reach the device? | a device `show` via `central_show_commands` | an API 200, or reading back through the same config API |
 | Is the cluster healthy? | `show lc-cluster group-membership` → `Cluster Enabled` + a real self address | the Central cluster object — a member missing `ip` reads back clean while the device says `Cluster Disabled` |
 | Is a tunnel anchoring clients? | a client in `show user-table` with `Forward mode: dtunnel` | `show ap database` / `show ap active` / the STM bucket map — AOS 8 constructs, empty by design here (§6, §7) |
@@ -925,9 +925,20 @@ return `422`. This enum differs from every other Central tool's device-function 
 ```
 GET /network-config/v1alpha1/wlan-ssids/<ssid>?object_type=LOCAL&scope_id=<id>&device_function=CAMPUS_AP
 ```
-returns the **library** object regardless of the query parameters. It will hand you a
-plausible-looking "baseline" of a scoped override that is actually a different object — observed
-returning `WPA2_PERSONAL` for an override that was `WPA3_SAE`.
+**REFINED 2026-09-01 — it is not that all parameters are ignored.** `object_type` is ignored on a
+GET; `view_type` IS honoured. Proven by probing all five shapes on one object
+(`lab-version-control/scripts/coa_probe_wlan_scoped_get.py`).
+
+Read and write take DIFFERENT addressing parameters, and the failure modes are asymmetric:
+
+| Op | Correct | Wrong param does what |
+|---|---|---|
+| GET | `view_type=LOCAL` + `scope_id` + `device_function` | `object_type` -> **200 with the library object** — SILENT |
+| PATCH | `object_type=LOCAL` + `scope_id` + `persona` | `view_type` -> **400 "ssid doesn't exist"** — LOUD |
+
+The silent one is the danger: it hands you a plausible-looking "baseline" of a scoped override that
+is actually a different object — observed returning `WPA2_PERSONAL` for an override that was
+`WPA3_SAE`.
 
 Use `central_get_wlan_profiles(view_type='LOCAL', scope_id=..., device_function=...)` to read a
 scoped override.
@@ -938,9 +949,10 @@ When APs move to a different site, any site-**LOCAL** WLAN override at the old s
 applying — the AP falls back to the site-collection (or library) definition. Nothing warns you,
 and Central still displays the override.
 
-**Classify the override with `metadata.count_objects_in_module.LOCAL` (§5p) — NOT by diffing against
-the parent.** A 2026-08-29 sweep "found" orphaned overrides at a site that had none: the scoped read
-returned inherited objects and they looked local.
+**Classify the override with `origin_scope_name` from `central_get_effective_config` (§5p) — NOT by
+diffing against the parent, and NOT with the LOCAL counter, which is unreliable (see §5p).** A
+2026-08-29 sweep "found" orphaned overrides at a site that had none: the scoped read returned
+inherited objects and they looked local.
 
 Signature: **Central says one security type, the air says another.** Confirm with a client scan
 (`nmcli dev wifi list`) rather than trusting the config model. Then either delete the orphaned
@@ -1475,22 +1487,42 @@ with a clean NAC config, while the client cannot reach the service being tested.
 device certificates, RADSec trust, cluster role, manual-vs-auto cluster, Identity Store, NAC config,
 shared secret, clock skew, NAS identity — three of which would have cost a rebuild.
 
-### 5p. `view_type=LOCAL` does NOT mean "only local objects"
+### 5p. Local-vs-inherited: use `origin_scope_name`, NOT the LOCAL counter   `[proven]`
 
-It returns the **effective** set — local overrides *and* inherited objects, mixed, with nothing in each
-object marking which is which. The only signal is `metadata.count_objects_in_module.{LOCAL,SHARED,ANY}`.
+**CORRECTED 2026-09-01.** This section previously named
+`metadata.count_objects_in_module.LOCAL` as the discriminator and claimed
+`central_get_scope_tree` resource lists are *effective*. Both halves were wrong, and the second was
+backwards. It was landed from inbox candidate AB, which was retracted the same day it was written.
 
-- **A zero diff against the parent means "inherited", not "identical duplicate".** Never conclude an
-  override exists because a scoped read returned an object.
-- **`central_get_scope_tree` resource lists are effective too.** A site showing N resources is NOT proof
-  any of them are defined there. Do not plan a cleanup from that list.
-- **Every baseline of a scoped object must record the metadata counter**, or it cannot later be shown to
-  have been a real override.
-- Classify an orphaned override with `metadata.count_objects_in_module.LOCAL`. If it is 0 there is
-  nothing to clean, however many objects the read returned.
+**The counter is unreliable.** CoA-Lab (141950462361563136), 2026-08-29: the counter reported
+`{LOCAL: 0, SHARED: 2, ANY: 2}` while two local overrides demonstrably existed. Do not classify with it.
 
-**Positive confirmation that an object IS local:** a divergent vault handle for its passphrase, or
-diverged field values — inheritance cannot produce divergence.
+**The scope tree lists LOCALLY-DEFINED resources**, the opposite of what this section used to say.
+Two proofs: a resource vanished from a site's list the moment its local object was deleted while the
+parent definition still existed; and a site's list has never contained objects that exist only at its
+parent.
+
+**The correct instrument** — a gate that was already landed before this section was written
+(`central-get-with-scope-id-returns-the-library-view`, LESSONS-PLATFORM-central, 2026-08-29):
+
+```
+central_get_effective_config(scope_id=<scope>, persona=<persona>, include_details=True)
+  -> read instances[].origin_scope_name
+     TWO origins  = LOCAL override shadowing a SHARED parent
+     ONE origin   = inherited / library only
+```
+
+Caveat: `include_details=True` returns instances with **no config payload** — it proves *where* an
+object is defined, not *what it contains*. Content still needs a scoped read.
+
+**Still true, and worth keeping:** a scoped read returns the effective set with nothing in each object
+marking which is which, so a zero diff against the parent means "inherited", not "identical
+duplicate". Never conclude an override exists because a scoped read returned an object. Positive
+confirmation an object IS local: a divergent vault handle or diverged field values — inheritance
+cannot produce divergence.
+
+**Also do not trust `central_get_effective_config` for device-group contents** — it reports them as
+absent. See INSTRUMENT-REGISTER.md; confirmed three times on 2026-08-31.
 
 ### 5n. Reading RADIUS counters: `Rej` with `Tmout 0` PROVES the certificate was accepted
 
