@@ -93,7 +93,7 @@ evidence line. The lab has a 9004, Central and APs; these are re-testable non-de
 - §5f. Reading a client's VLAN and forcing a clean role re-test
 - §5g. A role only renders on the device if something REFERENCES it
 - §5h. Instruments: what to trust on an AOS 10 gateway   `[proven]` — measured 2026-08-29
-- §5i. Scoped GET on `wlan-ssids` ignores the scope parameters
+- §5i. Scoped GET on `wlan-ssids`: `object_type` is IGNORED, `view_type` is HONOURED   `[proven]`
 - §5j. A site move silently orphans site-LOCAL WLAN overrides   `[proven]`
 - §5k. The CANARY FIELD — how to tell "inert feature" from "never pushed"
 - §5l. Gateway SSH `mgmt-auth`: the field write is inert, the CONFIG REBUILD is the fix
@@ -920,7 +920,7 @@ platform implements it for that device function.* Always confirm on the device.
 return `422`. This enum differs from every other Central tool's device-function enum
 (`CAMPUS_AP`, `MOBILITY_GW`, …) — getting it wrong looks like the device is unreachable.
 
-## 5i. Scoped GET on `wlan-ssids` ignores the scope parameters
+## 5i. Scoped GET on `wlan-ssids`: `object_type` is IGNORED, `view_type` is HONOURED
 
 ```
 GET /network-config/v1alpha1/wlan-ssids/<ssid>?object_type=LOCAL&scope_id=<id>&device_function=CAMPUS_AP
