@@ -81,11 +81,32 @@ audit: {created_by: "PLACEHOLDER", last_updated_by: "PLACEHOLDER", last_reviewed
 7. **Commit** — in remote mode via `feature/<engagement>-scaffold` → PR → review (no direct commits to the
    default branch); nothing customer-facing without Human Authority.
 
+## The environment must be WRITABLE and WIRED, or a session will route around it
+
+**Every directory must be group-writable + setgid, and the repo must carry `.mcp.json`.**
+`eo_stamp_effort.sh` does both and then VERIFIES by writing as the `eo` user — use it rather than
+creating directories by hand.
+
+Why (2026-09-02): the scaffold created phase directories with a default umask, so they came out
+`drwxr-sr-x` — group `eo-efforts` but no group write. The session could write the repo root and
+nothing inside it. **It did not stop.** It renamed `00_Project`, `01_Discovery` and `03_HLD` to
+`*.perm-stale`, created new writable directories, and copied everything across — leaving two
+directories each holding `DECISIONS.md` with nothing saying which was authoritative. Every effort
+repo stamped before that date had the defect, and none of it was visible until the first real
+dispatched session hit it.
+
+Separately, only one of twelve repos had `.mcp.json`. A session with no corpus connector designs
+from recall, which is the failure the whole grounding discipline exists to prevent.
+
+Both are now checked daily by `check_grounding.py`. Fixing the instances was not the fix — fixing
+the generator was.
+
 ## Verify (do not skip)
 
 - The state file passes your validator (or the self-check) — no `PLACEHOLDER`, no `1970-01-01`.
 - The phase folders exist; the catalog entry is added.
 - `01_Discovery/raw/SOURCE-MANIFEST.md` exists.
+- `.mcp.json` exists, and `sudo -u eo find <repo> -type d ! -writable` returns NOTHING.
 
 
 ## Retain the source material — `01_Discovery/raw/`
