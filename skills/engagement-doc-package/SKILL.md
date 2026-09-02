@@ -30,7 +30,8 @@ description: Produce the required engagement deliverable set to the documentatio
 | 2 | **ADR(s)** — decision records | `02_Engineering` | Each material decision: context, options, trade-offs, decision, **validation**, revisit triggers. |
 | 3 | **Architecture Recommendation** (with **Executive Summary**) | `03_HLD` | Recommended design and *why*, opening with a leadership-readable exec summary; options set aside. |
 | 4 | **DESIGN** — low-level design | `04_LLD` | Components, flows, exact config, ports, constraints. Implementable. |
-| 5 | **Topology / flow drawing** | `03/04` | A real diagram file (SVG/drawio), **not ASCII**. Auth/traffic/trust flow as needed. |
+| 5 | **Topology / flow drawing** | `03/04` | A real diagram file (SVG/drawio), **not ASCII**, and **RENDERED and looked at** before it ships (see the render gate below). Auth/traffic/trust flow as needed. |
+| 5b | **Assumptions register** | `03_HLD` | Every unknown we determined or recommended rather than asked about: *"we have assumed X; if X is wrong, Y changes."* See the classify-the-unknown gate below. |
 | 6 | **Baseline capture** | `05/06` | Live pre-change state so change is diffable + reversible — use [[config-backup]]. |
 | 7 | **Deployment / validation review** | `07/08` | What was deployed and **how the design was validated** to the observable effect (wire/packet/behavior). |
 
@@ -40,7 +41,31 @@ description: Produce the required engagement deliverable set to the documentatio
   schema-valid render) recorded in the ADR's *Validation* section and/or the deployment review — reflected
   in config, not just documented. Doc-conformance is not validation.
 - **Exec summary is mandatory** in the Architecture Recommendation (audience includes non-engineers).
-- **Drawings are real files** (SVG/drawio), version-controlled next to the design — never ASCII art.
+- **Drawings are real files** (SVG/drawio), version-controlled next to the design — never ASCII art —
+  and **RENDER EVERY DRAWING AND READ THE IMAGE BACK BEFORE SHIPPING IT.** Well-formed is not correct:
+  a drawing you have not rendered is a claim, not an artefact. Render twice — browser scale, and the
+  width it will be printed at (A4 landscape @150dpi = `output_width=1754`):
+  ```
+  /lab/venvs/svg/bin/python -c "import cairosvg; cairosvg.svg2png(url='x.svg', write_to='x.png', output_width=1754)"
+  ```
+  *(2026-09-02, McKinney HLD: a well-formed SVG that looked right in source had a label overflowing
+  into two adjacent boxes, an annotation crossed by four diagonal links, and two note lines in the
+  wrong order. All three would have shipped.)*
+- **CLASSIFY EVERY UNKNOWN BEFORE IT BECOMES A CUSTOMER QUESTION.** Three kinds, and only one of them
+  is a customer question:
+  | kind | where it belongs | test |
+  |---|---|---|
+  | we can determine it | our own work — the config, the export, the API | could any instrument we have, or have asked for, answer this? |
+  | we should recommend it | the design, as a recommendation | is this a choice the customer is paying us to make? |
+  | only they know it | the customer ask | intent, plans, constraints, what breaks, what is leaving |
+  The first two become the **assumptions register** in the Architecture Recommendation, never
+  questions. A question asks the customer to do our analysis; an assumption invites them to correct
+  it. *(2026-09-02, McKinney ISD: a 19-question information request was rejected by the Human — one
+  question stated our own conclusion and asked them to confirm it.)*
+- **A stencil label is not an instrument reading.** Model strings lifted from a customer drawing
+  (`N9K-...`, `Model 9800-80`) are `[record]` about the SHAPE someone picked from a palette. Nothing
+  may be sized, counted or priced from them, and they do not close a "no device models" blocker.
+  Adjacency claims come from the RENDERED page, never from extracted text.
 - **Traceability:** the Recommendation cites the ADR(s); the DESIGN cites the Recommendation; the
   validation review cites the acceptance criteria. Keep the chain intact.
 - **Secrets never in the package** — reference your `credentials_file`; **scrub before any external share**
@@ -69,6 +94,8 @@ validation log. **That is the floor; do not ship fewer.**
 ## Verify (do not skip)
 
 - All seven artifacts present (or the four-file floor), in the right phases.
+- **Every drawing rendered, and the image actually viewed** — at browser scale AND at print width.
+- **The assumptions register exists** and no question in the customer ask is one we could answer.
 - Traceability resolves (Recommendation → ADR; DESIGN → Recommendation; review → acceptance).
 - Each ADR has a real Validation section with evidence.
 - Sanitization + Human-Authority approval done before any external share.
