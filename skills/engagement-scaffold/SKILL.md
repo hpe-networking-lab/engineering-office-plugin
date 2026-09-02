@@ -38,6 +38,8 @@ Create these phase folders (each with a short README describing its purpose):
 <engagement>/
   00_Project/      Project_State.yaml + overview
   01_Discovery/    what the customer has/needs; requirements, constraints
+    raw/           AS-SUPPLIED customer material, byte-for-byte, never edited
+      SOURCE-MANIFEST.md   one row per file: name, received, from, sha256
   02_Engineering/  ADR(s) — decisions with validation
   03_HLD/          Architecture Recommendation (exec-summary first) + topology
   04_LLD/          DESIGN — components, flows, exact config, ports
@@ -73,17 +75,67 @@ audit: {created_by: "PLACEHOLDER", last_updated_by: "PLACEHOLDER", last_reviewed
 4. **Validate** — if `standards_source` ships a validator, run it and fix every error until it passes. If
    not, self-check: all required fields present, `current_phase` valid, phase list complete, no
    `PLACEHOLDER`/`1970-01-01` remaining.
-5. **Register it** — add a catalog/index entry (your projects catalog) so it's reproducible.
-6. **Commit** — in remote mode via `feature/<engagement>-scaffold` → PR → review (no direct commits to the
+5. **Create `01_Discovery/raw/` with a `SOURCE-MANIFEST.md`** — see "Retain the source material"
+   below. Empty is fine at scaffold time; the folder existing is what makes the habit cheap later.
+6. **Register it** — add a catalog/index entry (your projects catalog) so it's reproducible.
+7. **Commit** — in remote mode via `feature/<engagement>-scaffold` → PR → review (no direct commits to the
    default branch); nothing customer-facing without Human Authority.
 
 ## Verify (do not skip)
 
 - The state file passes your validator (or the self-check) — no `PLACEHOLDER`, no `1970-01-01`.
 - The phase folders exist; the catalog entry is added.
+- `01_Discovery/raw/SOURCE-MANIFEST.md` exists.
+
+
+## Retain the source material — `01_Discovery/raw/`
+
+**Every file the customer supplies is kept, byte-for-byte, in `01_Discovery/raw/`, and recorded in
+`01_Discovery/raw/SOURCE-MANIFEST.md` with a sha256.** Configs, exports, CSVs, packet captures,
+screenshots, spreadsheets. Unedited: parse into a separate artefact, never over the original.
+
+**Use the existing convention — `SOURCE-MANIFEST.md`.** Tarrant County F2026149 is the reference
+example (`tarrant-county/01_Discovery/raw/SOURCE-MANIFEST.md`); copy its shape rather than
+inventing a second name for the same thing. It also handles the case where the binaries are too
+large or sensitive for the repo: keep them in the local engagement workspace and record the path
+in the manifest. The manifest stays in the repo either way.
+
+```
+| File | Received | From | SHA256 |
+|---|---|---|---|
+| coa-conductor-2026-08-28.cfg | 2026-08-28 | <contact> | 70f4945e... |
+
+Customer data — local-only. Never GitHub, never Syncthing.
+```
+
+**Why (2026-09-01, City of Arlington):** a security finding was written from three controller
+configurations supplied on 2026-08-28. Those files were not retained. The finding now carries
+*"those files are no longer held in the engagement, so this has not been re-verified against its
+source since"* — every conclusion drawn from them became unfalsifiable, and a later contradiction
+in the record (AP-555 described as both Wi-Fi 6 and 6E) could not be settled by re-reading the
+source. It took a live device query instead, which is not always available and is never available
+after a customer decommissions kit.
+
+**The rule this encodes:** a finding is only as durable as its source. A parse is a *claim about*
+a file; without the file the claim cannot be checked, only believed. Keeping the raw material is
+what makes "verify against the authoritative source" possible six weeks later.
+
+Practical notes:
+
+- **Ingest on the box, not in a chat.** A 40,000-line config that passes through a conversation is
+  gone when the conversation ends and burns the context needed to think about it. Parse it where it
+  lands, cite the artefact.
+- **`raw/` is customer data.** It stays in the local-only engagement repo and never reaches a public
+  remote — run `sanitization-gate` before anything leaves.
+- **If a file cannot be retained** (licensing, customer instruction, size), say so in `SOURCE-MANIFEST.md`
+  explicitly with the reason. An intentional gap that is recorded is workable; a silent one is not.
+- **Record the sha256 even for files you cannot keep** — it lets a re-supplied copy be proven
+  identical to the one the finding was written from.
 
 ## Do NOT
 
 - Do not pre-populate the scaffold with another customer's data — start from `PLACEHOLDER`.
 - Do not put secrets/credentials in the engagement files.
 - Do not skip validation — an invalid state file breaks engagement tracking downstream.
+- Do not write a finding from a file you did not retain. If the source is gone, the finding must say
+  so where a reader will see it, not in a footnote.
