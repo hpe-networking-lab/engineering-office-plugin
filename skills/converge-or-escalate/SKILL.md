@@ -44,9 +44,13 @@ only the first exit runs until someone gets tired.
    Subtraction finds only single-variable causes; if the cause is conjunctive, every input clears
    individually and you find nothing. Establishing reproduction IS the work — do not treat it as a
    prerequisite you skip because it is slow. *(gate: `reproduce-before-you-bisect`)*
-2. **STATE THE SUCCESS CRITERION**, and show it has been met before on THIS platform. If no
-   known-good observation of that criterion exists, the failure is unverified and the first task is
-   establishing what healthy looks like. *(gate: `validate-the-success-criterion-before-chasing-it`)*
+2. **NAME THE OBSERVATION — not the concept.** What would you have to WATCH HAPPEN to believe it is
+   fixed? Not "filtering works" but "a client behind the firewall requests a known-blocked URL and
+   gets the block page." Then show that observation has been made before ON THIS PLATFORM; if no
+   known-good instance exists, the failure is unverified and establishing what healthy looks like IS
+   the first task. **If you cannot name the observation, stop — that is a discovery finding, not a
+   loop to enter.** Say so and ask. Iterating toward an undefined target is how a loop runs forever.
+   *(gate: `validate-the-success-criterion-before-chasing-it`)*
 3. **RUN THE DIAGNOSTIC ORDER FIRST.** `lab_search` the symptom → reachability → baseline diff →
    falsify from the record. Most loops that run long never ran step 0.
 4. **WRITE THE BUDGET DOWN.** Say, out loud and in the record, how many attempts you will make before
