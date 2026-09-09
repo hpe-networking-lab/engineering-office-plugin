@@ -94,7 +94,9 @@ validation log. **That is the floor; do not ship fewer.**
 **FORMAT — CORRECTED 2026-09-09, this skill previously prescribed `.md` and was wrong.**
 **A DELIVERABLE IS NEVER A `.md` FILE.** David does not read markdown, and neither does a customer.
 The Architecture Recommendation, the DESIGN, the migration plan and anything customer-facing ship as
-**HTML (default), docx or PDF** — versioned `-v1`/`-v2`, saved to the short-path project folder,
+**HTML (default), docx or PDF** — versioned `-v1`/`-v2`, saved to **the effort's OWN directory under**
+the short-path project folder (create it if absent; **never loose at the root** — mixing customers in
+one browsable folder defeats the per-customer-repo segregation),
 **rendered and read back before presenting**. **RECORDS stay markdown**: `DECISIONS.md`,
 `Project_State.yaml`, ADRs, blockers, findings — they are for chats, git and diffing.
 *(This skill told McKinney to write `DESIGN.md`; it did, 60K of it, and David does not open those.
