@@ -87,9 +87,18 @@ description: Produce the required engagement deliverable set to the documentatio
 
 ## Minimum bar (compact designs)
 
-A compact design may collapse to four files: `Architecture-Recommendation.md` (with exec summary),
-`DESIGN.md`, one `ADR` (with validation evidence), and one topology `.svg` — plus a pointer to the
+A compact design may collapse to four artefacts: the Architecture Recommendation (with exec summary),
+the DESIGN, one ADR (with validation evidence), and one topology `.svg` — plus a pointer to the
 validation log. **That is the floor; do not ship fewer.**
+
+**FORMAT — CORRECTED 2026-09-09, this skill previously prescribed `.md` and was wrong.**
+**A DELIVERABLE IS NEVER A `.md` FILE.** David does not read markdown, and neither does a customer.
+The Architecture Recommendation, the DESIGN, the migration plan and anything customer-facing ship as
+**HTML (default), docx or PDF** — versioned `-v1`/`-v2`, saved to the short-path project folder,
+**rendered and read back before presenting**. **RECORDS stay markdown**: `DECISIONS.md`,
+`Project_State.yaml`, ADRs, blockers, findings — they are for chats, git and diffing.
+*(This skill told McKinney to write `DESIGN.md`; it did, 60K of it, and David does not open those.
+The chat complied with a wrong standard.)*
 
 ## Verify (do not skip)
 
